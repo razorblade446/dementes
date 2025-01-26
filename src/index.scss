@@ -1,0 +1,19 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply w-full p-0 m-0 bg-orange-500;
+}
+
+#root {
+  @apply min-w-[1024px] w-4/5 m-auto;
+}
+
+h1 {
+  @apply text-2xl/[2] mb-[1rem];
+}
+
+h2 {
+  @apply text-xl/[1.5] mb-[1rem];
+}
