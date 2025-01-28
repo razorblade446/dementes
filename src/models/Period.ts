@@ -1,9 +1,10 @@
 import { Month } from '../constants/constants.ts';
 import { RetentionsSalary } from './RetentionsSalary.ts';
 
-export interface Monthly {
+export interface Period {
   month: Month;
   salaryUsd: number;
+  salaryCop: number;
   trm: number;
   baseSalary: number;
   retentions: RetentionsSalary;

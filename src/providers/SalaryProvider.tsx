@@ -1,32 +1,52 @@
 import { PropsWithChildren, useState } from 'react';
 import { Month, MONTHS } from '../constants/constants.ts';
-import { Monthly } from '../models/Monthly.ts';
-import { getSalaryRetentions, getTax, getTaxExemption } from '../utils/utils.ts';
-import { defaultMonthly, SalaryContext } from '../contexts/SalaryContext.ts';
+import { Period } from '../models/Period.ts';
+import { getBaseSalary, getNetSalaryRetentions, getSalaryRetentions, getTax, getTaxExemption } from '../utils/utils.ts';
+import { defaultPeriods, ISalaryContext, SalaryContext } from '../contexts/SalaryContext.ts';
+import Big from 'big.js';
 
 export const SalaryProvider = ({ children }: PropsWithChildren) => {
-  const [monthly, setMonthly] = useState(defaultMonthly);
+  const [periods, setPeriods] = useState(defaultPeriods);
 
-  const value = {
-    monthly,
-    updateMonth: (month: Month, monthly: Monthly) => {
-      setMonthly(prevMonths => {
+  const value: ISalaryContext = {
+    periods,
+    updatePeriod: (month: Month, period: Period) => {
+      setPeriods(oldPeriods => {
         let exemptAccumulate = 0;
-        for (const keyMonth in MONTHS) {
-          const currentMonth = month === keyMonth ? monthly : prevMonths[keyMonth as Month];
 
-          const salaryCOP = currentMonth.salaryUsd * currentMonth.trm;
+        const newPeriods = {} as Record<Month, Period>;
 
-          currentMonth.retentions = getSalaryRetentions(salaryCOP);
-          currentMonth.tax = getTax(salaryCOP, exemptAccumulate);
+        for (const keyMonth of MONTHS) {
+          const currentMonth = month === keyMonth ? period : oldPeriods[keyMonth as Month];
 
-          currentMonth.netSalary = salaryCOP - currentMonth.retentions.health - currentMonth.retentions.retirement - (currentMonth.retentions.solidarity ?? 0) - currentMonth.tax;
+          const salaryCop = Big(currentMonth.salaryUsd).times(currentMonth.trm).toNumber();
+          const baseSalary = getBaseSalary(salaryCop);
+          const retentions = getSalaryRetentions(salaryCop);
+          const netSalaryRetentions = getNetSalaryRetentions(salaryCop);
+          const tax = getTax(salaryCop, exemptAccumulate);
 
-          exemptAccumulate += getTaxExemption(salaryCOP, exemptAccumulate);
+          const netSalary = Big(salaryCop).minus(netSalaryRetentions).minus(tax).toNumber();
+
+          newPeriods[keyMonth as Month] = {
+            ...currentMonth,
+            salaryCop,
+            baseSalary,
+            retentions,
+            tax,
+            netSalary
+          }
+
+          exemptAccumulate += getTaxExemption(salaryCop, exemptAccumulate);
         }
 
-        return prevMonths;
+        localStorage.setItem('periods', JSON.stringify(newPeriods));
+
+        return newPeriods;
       });
+    },
+    resetPeriods: () => {
+      localStorage.removeItem('periods');
+      setPeriods(defaultPeriods);
     }
   };
 

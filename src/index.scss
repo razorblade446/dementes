@@ -1,17 +1,16 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@use 'tailwindcss';
 
 body {
-  @apply w-full p-0 m-0 bg-orange-500;
+  @apply bg-orange-50;
 }
 
 #root {
-  @apply min-w-[1024px] w-4/5 m-auto;
+  // @apply block relative min-w-7xl w-7xl m-auto overflow-visible flex flex-col items-stretch;
+  @apply block relative m-auto overflow-visible flex flex-col items-stretch;
 }
 
 h1 {
-  @apply text-2xl/[2] mb-[1rem];
+  @apply text-3xl my-[1rem] font-bold text-white;
 }
 
 h2 {
