@@ -1,6 +1,8 @@
 import { useContext } from 'react';
 import { SalaryContext } from '../../contexts/SalaryContext.ts';
 
+const githubImgUrl = new URL('/github-mark.svg', import.meta.url).href;
+
 export default function NavigationBar() {
   const { resetPeriods } = useContext(SalaryContext);
 
@@ -18,7 +20,7 @@ export default function NavigationBar() {
           </button>
           <div className="inline-block text-sm leading-none">
             <a href="https://github.com/razorblade446/dementes" target="_blank" title="Repositorio Github">
-              <img className="p-none w-[24px] h-[24px]" src="/github-mark.svg"/>
+              <img className="p-none w-[24px] h-[24px]" src={githubImgUrl} alt="Github"/>
             </a>
           </div>
         </div>
