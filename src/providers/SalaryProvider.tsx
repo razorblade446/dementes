@@ -1,25 +1,57 @@
-import { PropsWithChildren, useState } from 'react';
-import { Month, MONTHS } from '../constants/constants.ts';
+import { PropsWithChildren, useCallback, useState } from 'react';
+import { Month, MONTHS, PeriodType } from '../constants/constants.ts';
 import { Period } from '../models/Period.ts';
-import { getBaseSalary, getNetSalaryRetentions, getSalaryRetentions, getTax, getTaxExemption } from '../utils/utils.ts';
-import { defaultPeriods, ISalaryContext, SalaryContext } from '../contexts/SalaryContext.ts';
+import {
+  getBasePeriods,
+  getBasePeriodsAll,
+  getBaseSalary,
+  getNetSalaryRetentions,
+  getSalaryRetentions,
+  getStorageKey,
+  getTax,
+  getTaxExemption,
+  setStorage
+} from '../utils/utils.ts';
+import { ISalaryContext, SalaryContextBuilder } from '../contexts/SalaryContext.ts';
 import Big from 'big.js';
+import { CurrencyYearSalaries, YearSalaries } from '../models/YearSalaries.ts';
 
-export const SalaryProvider = ({ children }: PropsWithChildren) => {
-  const [periods, setPeriods] = useState(defaultPeriods);
+type PeriodsFn = (oldPeriods: YearSalaries) => YearSalaries;
+
+export const SalaryProvider = ({ periodType, children }: PropsWithChildren & { periodType: PeriodType }) => {
+  const basePeriods = getBasePeriodsAll();
+  const [allPeriods, setPeriodsAll] = useState(basePeriods);
+
+  const setPeriods = useCallback((periodsArg: PeriodsFn | CurrencyYearSalaries) => {
+    if (typeof periodsArg === 'function') {
+      setPeriodsAll((allPeriods) => {
+        const newPeriods = periodsArg(allPeriods[periodType] as YearSalaries);
+        return {
+          ...allPeriods,
+          [periodType]: newPeriods
+        };
+      });
+    } else {
+      setPeriodsAll(periodsArg);
+    }
+  }, [periodType]);
 
   const value: ISalaryContext = {
-    periods,
+    periodType,
+    periods: allPeriods[periodType] as YearSalaries,
     updatePeriod: (month: Month, period: Period) => {
-      setPeriods(oldPeriods => {
+      setPeriods((oldPeriods: YearSalaries) => {
         let exemptAccumulate = 0;
 
-        const newPeriods = {} as Record<Month, Period>;
+        const newPeriods = {} as YearSalaries;
 
         for (const keyMonth of MONTHS) {
           const currentMonth = month === keyMonth ? period : oldPeriods[keyMonth as Month];
 
-          const salaryCop = Big(currentMonth.salaryUsd).times(currentMonth.trm).toNumber();
+          const salaryUsd = periodType === PeriodType.USD ? currentMonth.salaryUsd : 0;
+          const trm = periodType === PeriodType.USD ? currentMonth.trm : 0;
+
+          const salaryCop = periodType === PeriodType.USD ? Big(currentMonth.salaryUsd).times(currentMonth.trm).toNumber() : currentMonth.salaryCop;
           const baseSalary = getBaseSalary(salaryCop);
           const retentions = getSalaryRetentions(salaryCop);
           const netSalaryRetentions = getNetSalaryRetentions(salaryCop);
@@ -29,27 +61,35 @@ export const SalaryProvider = ({ children }: PropsWithChildren) => {
 
           newPeriods[keyMonth as Month] = {
             ...currentMonth,
+            salaryUsd,
+            trm,
             salaryCop,
             baseSalary,
             retentions,
             tax,
             netSalary
-          }
+          };
 
           exemptAccumulate += getTaxExemption(salaryCop, exemptAccumulate);
         }
 
-        localStorage.setItem('periods', JSON.stringify(newPeriods));
+        setStorage(periodType, newPeriods);
 
         return newPeriods;
       });
     },
     resetPeriods: () => {
-      localStorage.removeItem('periods');
-      setPeriods(defaultPeriods);
+      localStorage.removeItem(getStorageKey(periodType));
+
+      setPeriods({
+        ...allPeriods,
+        [periodType]: getBasePeriods(periodType)
+      });
     }
   };
 
-  return <SalaryContext.Provider value={ value }>{ children }</SalaryContext.Provider>;
+  const SalaryContextWrapper = SalaryContextBuilder.getSalaryContext(periodType);
+
+  return <SalaryContextWrapper.Provider value={ value }>{ children }</SalaryContextWrapper.Provider>;
 
 };

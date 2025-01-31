@@ -5,6 +5,7 @@ import {
   MINIMUM_SALARY,
   Month,
   MONTHS,
+  PeriodType,
   RETIREMENT_CONTRIBUTION,
   UVT,
   UVT_LIMIT_EXEMPTION
@@ -12,6 +13,23 @@ import {
 import Big from 'big.js';
 import { RetentionsSalary } from '../models/RetentionsSalary.ts';
 import { Period } from '../models/Period.ts';
+import { CurrencyYearSalaries } from '../models/YearSalaries.ts';
+
+export const getStorageKey = (periodType: PeriodType) => {
+  return `periods-${ periodType }`;
+};
+
+export const getStorage = (periodType: PeriodType) => {
+  const storageKey = getStorageKey(periodType);
+  const storedPeriods = localStorage.getItem(storageKey);
+
+  return storedPeriods ? JSON.parse(storedPeriods) : null;
+};
+
+export const setStorage = (periodType: PeriodType, periods: Record<Month, Period>) => {
+  const storageKey = getStorageKey(periodType);
+  localStorage.setItem(storageKey, JSON.stringify(periods));
+};
 
 export const getBaseSalary = (salary: number): number => {
   const baseSalary = Big(salary).gte(INTEGRAL_LIMIT) ? Big(salary).times(.7) : Big(salary);
@@ -131,13 +149,15 @@ export const getNetSalary = (salary: number, exemptAccumulate: number) => {
   return Big(salary).minus(totalRetentions).minus(tax).toNumber();
 };
 
-export const getBasePeriods = () => {
-  let exemptAccumulate = 0;
-  return MONTHS.reduce<Record<Month, Period>>((periods, month) => {
-    const salaryUsd = 3000;
-    const trm = 4321.19;
+export const getBasePeriods = (periodType: PeriodType) => {
+  const storedPeriods = getStorage(periodType);
 
-    const salaryCop = Big(salaryUsd).times(trm).toNumber();
+  let exemptAccumulate = 0;
+  return storedPeriods || MONTHS.reduce<Record<Month, Period>>((periods, month) => {
+    const salaryUsd = periodType === PeriodType.USD ? 3000 : 0;
+    const trm = periodType === PeriodType.USD ? 4321.19 : 0;
+
+    const salaryCop = periodType === PeriodType.USD ? Big(salaryUsd).times(trm).toNumber() : 12000000;
 
     const baseSalary = getBaseSalary(salaryCop);
     const retentions = getSalaryRetentions(salaryCop);
@@ -161,6 +181,23 @@ export const getBasePeriods = () => {
 
     return periods;
   }, {} as unknown as Record<Month, Period>);
+};
+
+export const getBasePeriodsAll = (): CurrencyYearSalaries => {
+  return [PeriodType.COP, PeriodType.USD].reduce((periods, periodType) => {
+    return {
+      ...periods,
+      [periodType]: getBasePeriods(periodType)
+    };
+  }, {});
+};
+
+export const getBasePeriodsUsd = () => {
+  return getBasePeriods(PeriodType.USD);
+};
+
+export const getBasePeriodsCop = () => {
+  return getBasePeriods(PeriodType.COP);
 };
 
 export const financial = (value: number): string => {

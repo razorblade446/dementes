@@ -1,20 +1,40 @@
-import { Month } from '../constants/constants.ts';
+import { Month, PeriodType } from '../constants/constants.ts';
 import { Period } from '../models/Period.ts';
-import { getBasePeriods } from '../utils/utils.ts';
-import { createContext } from 'react';
+import { Context, createContext } from 'react';
 
 export interface ISalaryContext {
+  periodType: PeriodType;
   periods: Record<Month, Period>;
   updatePeriod: (month: Month, period: Period) => void;
   resetPeriods: () => void;
 }
 
-const storedPeriods = localStorage.getItem('periods');
-
-export const defaultPeriods: Record<Month, Period> = storedPeriods ? JSON.parse(storedPeriods) : getBasePeriods();
-
 export const SalaryContext = createContext<ISalaryContext>({
-  periods: defaultPeriods, updatePeriod: () => {
-  }, resetPeriods: () => {
+  periodType: PeriodType.COP,
+  periods: {} as Record<Month, Period>,
+  updatePeriod: () => {
+  },
+  resetPeriods: () => {
   }
 });
+
+export class SalaryContextBuilder {
+  private static instances = new Map<PeriodType, Context<ISalaryContext>>();
+
+  static getSalaryContext(periodType: PeriodType): Context<ISalaryContext> {
+    if (!SalaryContextBuilder.instances.has(periodType)) {
+      const salaryContext = {
+        periodType: periodType,
+        periods: {} as Record<Month, Period>,
+        updatePeriod: (_month: Month, _period: Period) => {
+        },
+        resetPeriods: () => {
+        }
+      };
+
+      SalaryContextBuilder.instances.set(periodType, createContext(salaryContext));
+    }
+
+    return SalaryContextBuilder.instances.get(periodType) as Context<ISalaryContext>;
+  }
+}

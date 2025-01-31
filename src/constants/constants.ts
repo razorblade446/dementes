@@ -5,6 +5,11 @@ export const MONTHS = [
 
 export type Month = typeof MONTHS[number];
 
+export enum PeriodType {
+  COP = 'COP',
+  USD = 'USD'
+}
+
 // Updated to 2025
 export const UVT = 49799;
 export const UVT_LIMIT = 790;
