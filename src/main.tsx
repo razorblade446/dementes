@@ -17,7 +17,8 @@ createRoot(document.getElementById('root')!).render(
                    element={ <SalaryProvider periodType={ PeriodType.USD }><SalarySectionUsd/></SalaryProvider> }/>
             <Route path="cop"
                    element={ <SalaryProvider periodType={ PeriodType.COP }><SalarySectionCop/></SalaryProvider> }/>
-            <Route path="*" element={ <Navigate to="/usd" replace/> }/>
+            <Route path="*" element={ <Navigate to="/cop" replace/> }/>
+            <Route path="" element={ <Navigate to="/cop" replace/> }/>
           </Route>
         </Routes>
       </BrowserRouter>
