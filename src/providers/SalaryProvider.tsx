@@ -49,28 +49,32 @@ export const SalaryProvider = ({ periodType, children }: PropsWithChildren & { p
           const currentMonth = month === keyMonth ? period : oldPeriods[keyMonth as Month];
 
           const salaryUsd = periodType === PeriodType.USD ? currentMonth.salaryUsd : 0;
+          const bonusUsd = periodType === PeriodType.USD ? currentMonth.bonusUsd : 0;
           const trm = periodType === PeriodType.USD ? currentMonth.trm : 0;
 
           const salaryCop = periodType === PeriodType.USD ? Big(currentMonth.salaryUsd).times(currentMonth.trm).toNumber() : currentMonth.salaryCop;
+          const bonusCop = periodType === PeriodType.USD ? Big(currentMonth.bonusUsd).times(currentMonth.trm).toNumber() : currentMonth.bonusCop;
           const baseSalary = getBaseSalary(salaryCop);
           const retentions = getSalaryRetentions(salaryCop);
           const netSalaryRetentions = getNetSalaryRetentions(salaryCop);
-          const tax = getTax(salaryCop, exemptAccumulate);
+          const tax = getTax(salaryCop, bonusCop, exemptAccumulate);
 
-          const netSalary = Big(salaryCop).minus(netSalaryRetentions).minus(tax).toNumber();
+          const netSalary = Big(salaryCop).plus(bonusCop).minus(netSalaryRetentions).minus(tax).toNumber();
 
           newPeriods[keyMonth as Month] = {
             ...currentMonth,
             salaryUsd,
+            bonusUsd,
             trm,
             salaryCop,
+            bonusCop,
             baseSalary,
             retentions,
             tax,
             netSalary
           };
 
-          exemptAccumulate += getTaxExemption(salaryCop, exemptAccumulate);
+          exemptAccumulate += getTaxExemption(salaryCop, bonusCop, exemptAccumulate);
         }
 
         setStorage(periodType, newPeriods);

@@ -85,7 +85,7 @@ export const getNetSalaryRetentions = (salary: number): number => {
   return Big(health).plus(retirement).plus(solidarity ?? 0).toNumber();
 };
 
-export const getTaxExemption = (salary: number, exemptAccumulate: number): number => {
+export const getTaxExemption = (salary: number, bonus: number ,exemptAccumulate: number): number => {
   const netSalaryRetentions = getNetSalaryRetentions(salary);
 
   const deductedSalary = Big(salary).minus(netSalaryRetentions);
@@ -97,23 +97,23 @@ export const getTaxExemption = (salary: number, exemptAccumulate: number): numbe
     remainingExempt = Big(0);
   }
 
-  const trialExempt = deductedSalary.times(EXEMPTION_FACTOR);
+  const trialExempt = deductedSalary.plus(bonus).times(EXEMPTION_FACTOR);
 
   return (trialExempt.gt(remainingExempt) ? remainingExempt : trialExempt).toNumber();
 };
 
-export const getTaxableSalary = (salary: number, exemptAccumulate: number): number => {
+export const getTaxableSalary = (salary: number, bonus: number, exemptAccumulate: number): number => {
   const netSalaryRetentions = getNetSalaryRetentions(salary);
 
   const deductedSalary = Big(salary).minus(netSalaryRetentions);
 
-  const realExempt = getTaxExemption(salary, exemptAccumulate);
+  const realExempt = getTaxExemption(salary, bonus, exemptAccumulate);
 
-  return deductedSalary.minus(realExempt).toNumber();
+  return deductedSalary.plus(bonus).minus(realExempt).toNumber();
 };
 
-export const getTax = (salary: number, exemptAccumulate: number): number => {
-  const taxableSalary = Big(getTaxableSalary(salary, exemptAccumulate));
+export const getTax = (salary: number, bonus: number, exemptAccumulate: number): number => {
+  const taxableSalary = Big(getTaxableSalary(salary, bonus, exemptAccumulate));
 
   const salaryUvt = taxableSalary.div(UVT);
 
@@ -139,14 +139,14 @@ export const getTax = (salary: number, exemptAccumulate: number): number => {
   }
 };
 
-export const getNetSalary = (salary: number, exemptAccumulate: number) => {
+export const getNetSalary = (salary: number, bonus: number, exemptAccumulate: number) => {
   const { health, retirement, solidarity } = getSalaryRetentions(salary);
 
   const totalRetentions = Big(health).plus(retirement).plus(solidarity ?? 0);
 
-  const tax = getTax(salary, exemptAccumulate);
+  const tax = getTax(salary, bonus, exemptAccumulate);
 
-  return Big(salary).minus(totalRetentions).minus(tax).toNumber();
+  return Big(salary).plus(bonus).minus(totalRetentions).minus(tax).toNumber();
 };
 
 export const getBasePeriods = (periodType: PeriodType) => {
@@ -155,14 +155,17 @@ export const getBasePeriods = (periodType: PeriodType) => {
   let exemptAccumulate = 0;
   return storedPeriods || MONTHS.reduce<Record<Month, Period>>((periods, month) => {
     const salaryUsd = periodType === PeriodType.USD ? 3000 : 0;
-    const trm = periodType === PeriodType.USD ? 4321.19 : 0;
+    const trm = periodType === PeriodType.USD ? 4000 : 0;
 
     const salaryCop = periodType === PeriodType.USD ? Big(salaryUsd).times(trm).toNumber() : 12000000;
+
+    const bonusUsd = periodType === PeriodType.USD ? 1300 : 0;
+    const bonusCop = periodType === PeriodType.USD ? Big(bonusUsd).times(trm).toNumber() : 5200000;
 
     const baseSalary = getBaseSalary(salaryCop);
     const retentions = getSalaryRetentions(salaryCop);
     const netSalaryRetentions = getNetSalaryRetentions(salaryCop);
-    const tax = getTax(salaryCop, exemptAccumulate);
+    const tax = getTax(salaryCop, bonusCop, exemptAccumulate);
 
     const netSalary = Big(salaryCop).minus(netSalaryRetentions).minus(tax).toNumber();
 
@@ -170,6 +173,8 @@ export const getBasePeriods = (periodType: PeriodType) => {
       month,
       salaryUsd,
       salaryCop,
+      bonusUsd,
+      bonusCop,
       trm,
       baseSalary,
       retentions,
@@ -177,7 +182,7 @@ export const getBasePeriods = (periodType: PeriodType) => {
       netSalary
     };
 
-    exemptAccumulate += getTaxExemption(salaryCop, exemptAccumulate);
+    exemptAccumulate += getTaxExemption(salaryCop, bonusCop, exemptAccumulate);
 
     return periods;
   }, {} as unknown as Record<Month, Period>);

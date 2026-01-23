@@ -8,7 +8,7 @@ function App() {
       <>
         <NavigationBar></NavigationBar>
 
-        <main className="container max-w-screen-xl mx-auto mt-20 flex flex-wrap flex-col gap-6">
+        <main className="container max-w-dvw mx-auto mt-20 flex flex-wrap flex-col gap-6">
           <LegalInfo></LegalInfo>
           <Outlet></Outlet>
         </main>

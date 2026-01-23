@@ -6,6 +6,8 @@ export interface Period {
   salaryUsd: number;
   salaryCop: number;
   trm: number;
+  bonusUsd: number;
+  bonusCop: number;
   baseSalary: number;
   retentions: RetentionsSalary;
   tax: number;

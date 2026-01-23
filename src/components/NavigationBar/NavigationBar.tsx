@@ -25,7 +25,7 @@ export default function NavigationBar() {
                 onClick={ resetPeriods }>
               Reiniciar Valores
             </button>
-            <a className="py-4" href={ githubImgUrl } target="_blank" title="Repositorio Github">
+            <a className="py-4" href="https://github.com/razorblade446/dementes" target="_blank" title="Repositorio Github">
               <img className="w-6 h-6" src={ githubImgUrl } alt="Github"/>
             </a>
           </div>

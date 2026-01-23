@@ -33,17 +33,19 @@ export default function SalarySectionUsd() {
 
   return (
       <SalaryProvider periodType={ PeriodType.USD }>
-        <section className="max-w-screen-xl flex flex-wrap justify-between p-8 shadow-xl bg-white bg-opacity-65">
+        <section className="flex flex-wrap justify-between p-8 shadow-xl bg-white bg-opacity-65">
           {/*<section className="min-w-screen-xl my-8 p-8 flex flex-col shadow-xl bg-white bg-opacity-65">*/ }
           <h2>Detalle de ingresos brutos y netos mes a mes</h2>
           <table className="table-auto w-full shadow-xl bg-orange-50">
             <thead>
             <tr className="border-b-[1px] border-gray-700 text-orange-500">
-              <th scope="col" className="">Mes</th>
-              <th scope="col">Salario USD</th>
-              <th scope="col">TRM</th>
+              <th scope="col">Mes</th>
+              <th scope="col" className="w-[150px]">Salario USD</th>
+              <th scope="col" className="w-[150px]">Bono USD</th>
+              <th scope="col" className="w-[150px]">TRM</th>
               <th scope="col">Salario COP</th>
               <th scope="col">Salario Base</th>
+              <th scope="col" className="max-w-[200px]">Bono COP</th>
               <th scope="col" className="break-word">Retenciones<br/>Salariales</th>
               <th scope="col">Retefuente</th>
               <th scope="col">Salario Neto</th>

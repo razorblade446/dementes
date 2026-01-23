@@ -11,12 +11,12 @@ export enum PeriodType {
 }
 
 // Updated to 2025
-export const UVT = 49799;
+export const UVT = 52374;
 export const UVT_LIMIT = 790;
 export const UVT_LIMIT_EXEMPTION = UVT * UVT_LIMIT;
 export const EXEMPTION_FACTOR = 0.25;
 
-export const MINIMUM_SALARY = 1423500;
+export const MINIMUM_SALARY = 1750905;
 export const INTEGRAL_LIMIT = MINIMUM_SALARY * 13;
 
 export const MINIMUM_SOLIDARY_RETIREMENT = 4 * MINIMUM_SALARY;
