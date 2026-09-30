@@ -1,15 +1,17 @@
-import { financial, getEffectiveTrm, getNetSalaryRetentions } from '../../utils/utils.ts';
+import { financial, getEffectiveTrm, getNetSalaryRetentions, getSemesterAvgBaseSalary, isPrimaMonth } from '../../utils/utils.ts';
 import { Period } from '../../models/Period.ts';
 import { ISalaryContext } from '../../contexts/SalaryContext.ts';
 import { ChangeEvent, useEffect, useState } from 'react';
 import { Month, PeriodType } from '../../constants/constants.ts';
 import { ArrowPathIcon, ChevronDoubleDownIcon } from '@heroicons/react/24/solid';
 
-export default function SalaryPeriod({ periodType, period, updatePeriod, handleCopySalary }: {
+export default function SalaryPeriod({ periodType, period, periods, updatePeriod, handleCopySalary, showPrima }: {
   periodType: PeriodType,
   period: Period,
+  periods: Record<Month, Period>,
   updatePeriod: ISalaryContext['updatePeriod'],
   handleCopySalary: (month: Month) => void;
+  showPrima: boolean;
 }) {
   const [manualTrm, setManualTrm] = useState(period.manualTrm);
   const [salaryUsd, setSalaryUsd] = useState(period.salaryUsd);
@@ -158,6 +160,12 @@ export default function SalaryPeriod({ periodType, period, updatePeriod, handleC
       financial(period.bonusCop)
   );
 
+  const primaCell = isPrimaMonth(period.month) ? (
+      <span title={ `Promedio salario base del semestre: ${ financial(getSemesterAvgBaseSalary(periods, period.month)) }` }>
+        { financial(period.prima) }
+      </span>
+  ) : '-';
+
   return (
       <tr className="border-b-[1px] last:border-none" key={ period.month }>
         <td className="text-center p-2">{ period.month }</td>
@@ -167,6 +175,7 @@ export default function SalaryPeriod({ periodType, period, updatePeriod, handleC
         <td className="w-[150px] text-center">{ salaryCopCell }</td>
         <td className="text-center p-2">{ financial(period.baseSalary) }</td>
         <td className="w-[150px] text-center">{ bonusCopCell }</td>
+        { showPrima && <td className="text-center p-2">{ primaCell }</td> }
         <td className="text-center p-2">{ financial(getNetSalaryRetentions(period.salaryCop)) }</td>
         <td className="text-center p-2">{ financial(period.tax) }</td>
         <td className="text-center p-2">{ financial(period.netSalary) }</td>

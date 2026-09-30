@@ -8,14 +8,19 @@ import {
   getEffectiveTrm,
   getHealthContribution,
   getNetSalary,
+  getPrima,
+  getPrimaExemption,
+  getPrimaTax,
   getRetirementContribution,
   getSalaryRetentions,
+  getSemesterAvgBaseSalary,
   getSolidaryRetirement,
   getStorage,
   getStorageKey,
   getTax,
   getTaxableSalary,
   getTaxExemption,
+  isPrimaMonth,
   removeStorage,
   setStorage
 } from './utils.ts';
@@ -312,6 +317,89 @@ describe('getDefaultPeriods', () => {
     const netSalaryRetentions = retentions.health + retentions.retirement + (retentions.solidarity ?? 0);
 
     expect(periods.Enero.netSalary).toBe(salaryCop + bonusCop - netSalaryRetentions - tax);
+  });
+});
+
+describe('isPrimaMonth', () => {
+  it('is true only for Junio and Diciembre', () => {
+    expect(isPrimaMonth('Junio')).toBe(true);
+    expect(isPrimaMonth('Diciembre')).toBe(true);
+    expect(isPrimaMonth('Enero')).toBe(false);
+    expect(isPrimaMonth('Julio')).toBe(false);
+  });
+});
+
+describe('getSemesterAvgBaseSalary', () => {
+  it('averages the six baseSalary values of the semester containing the month', () => {
+    const periods = getDefaultPeriods(PeriodType.COP);
+
+    expect(getSemesterAvgBaseSalary(periods, 'Junio')).toBe(12000000);
+    expect(getSemesterAvgBaseSalary(periods, 'Diciembre')).toBe(12000000);
+  });
+
+  it('reflects varying monthly salaries within the semester', () => {
+    const periods = getDefaultPeriods(PeriodType.COP);
+    periods.Enero = { ...periods.Enero, baseSalary: 18000000 };
+
+    // (18,000,000 + 12,000,000 * 5) / 6 = 13,000,000
+    expect(getSemesterAvgBaseSalary(periods, 'Junio')).toBe(13000000);
+  });
+});
+
+describe('getPrima', () => {
+  it('is half of the semester average base salary', () => {
+    expect(getPrima(12000000)).toBe(6000000);
+  });
+});
+
+describe('getPrimaExemption', () => {
+  it('is 25% of the prima when the annual cap has room', () => {
+    expect(getPrimaExemption(6000000, 0)).toBe(1500000);
+  });
+
+  it('caps at the remaining annual exemption', () => {
+    expect(getPrimaExemption(6000000, UVT_LIMIT_EXEMPTION - 1000)).toBe(1000);
+  });
+
+  it('is 0 once the annual cap is exhausted', () => {
+    expect(getPrimaExemption(6000000, UVT_LIMIT_EXEMPTION)).toBe(0);
+  });
+});
+
+describe('getPrimaTax (Procedimiento 1)', () => {
+  it('is 0 when the exempted prima stays under 95 UVT', () => {
+    // prima 5,000,000 - 25% exemption (1,250,000) = 3,750,000; 3,750,000 / UVT = 71.6 <= 95
+    expect(getPrimaTax(5000000, 0)).toBe(0);
+  });
+
+  it('is taxed independently of any salary/bonus bracket once the exempted prima exceeds 95 UVT', () => {
+    // prima 8,000,000 - 25% exemption (2,000,000) = 6,000,000; 6,000,000 / UVT = 114.56
+    // tax = (114.56... - 95) * .19 * 52,374 -> floored to nearest 1000
+    expect(getPrimaTax(8000000, 0)).toBe(194000);
+  });
+});
+
+describe('getDefaultPeriods prima integration', () => {
+  it('has no prima on non-Junio/Diciembre months', () => {
+    const periods = getDefaultPeriods(PeriodType.COP);
+
+    expect(periods.Enero.prima).toBe(0);
+    expect(periods.Mayo.prima).toBe(0);
+  });
+
+  it('sets Junio and Diciembre prima to half the semester average base salary', () => {
+    const periods = getDefaultPeriods(PeriodType.COP);
+
+    expect(periods.Junio.prima).toBe(6000000);
+    expect(periods.Diciembre.prima).toBe(6000000);
+  });
+
+  it('includes prima and primaTax in netSalary and tax for a prima month', () => {
+    const periods = getDefaultPeriods(PeriodType.COP);
+    const { salaryCop, bonusCop, prima, tax, netSalary, retentions } = periods.Junio;
+    const netSalaryRetentions = retentions.health + retentions.retirement + (retentions.solidarity ?? 0);
+
+    expect(netSalary).toBe(salaryCop + bonusCop + prima - netSalaryRetentions - tax);
   });
 });
 
