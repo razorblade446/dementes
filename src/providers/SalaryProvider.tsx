@@ -1,15 +1,15 @@
-import { PropsWithChildren, useCallback, useState } from 'react';
+import { PropsWithChildren, useCallback, useEffect, useState } from 'react';
 import { Month, MONTHS, PeriodType } from '../constants/constants.ts';
 import { Period } from '../models/Period.ts';
 import {
-  getBasePeriods,
   getBasePeriodsAll,
   getBaseSalary,
+  getDefaultPeriods,
   getNetSalaryRetentions,
   getSalaryRetentions,
-  getStorageKey,
   getTax,
   getTaxExemption,
+  removeStorage,
   setStorage
 } from '../utils/utils.ts';
 import { ISalaryContext, SalaryContextBuilder } from '../contexts/SalaryContext.ts';
@@ -18,9 +18,21 @@ import { CurrencyYearSalaries, YearSalaries } from '../models/YearSalaries.ts';
 
 type PeriodsFn = (oldPeriods: YearSalaries) => YearSalaries;
 
+const getDefaultPeriodsAll = (): CurrencyYearSalaries => {
+  return [PeriodType.COP, PeriodType.USD].reduce((periods, periodType) => {
+    return {
+      ...periods,
+      [periodType]: getDefaultPeriods(periodType)
+    };
+  }, {} as CurrencyYearSalaries);
+};
+
 export const SalaryProvider = ({ periodType, children }: PropsWithChildren & { periodType: PeriodType }) => {
-  const basePeriods = getBasePeriodsAll();
-  const [allPeriods, setPeriodsAll] = useState(basePeriods);
+  const [allPeriods, setPeriodsAll] = useState(getDefaultPeriodsAll);
+
+  useEffect(() => {
+    getBasePeriodsAll().then(setPeriodsAll);
+  }, []);
 
   const setPeriods = useCallback((periodsArg: PeriodsFn | CurrencyYearSalaries) => {
     if (typeof periodsArg === 'function') {
@@ -83,11 +95,11 @@ export const SalaryProvider = ({ periodType, children }: PropsWithChildren & { p
       });
     },
     resetPeriods: () => {
-      localStorage.removeItem(getStorageKey(periodType));
+      removeStorage(periodType);
 
       setPeriods({
         ...allPeriods,
-        [periodType]: getBasePeriods(periodType)
+        [periodType]: getDefaultPeriods(periodType)
       });
     }
   };

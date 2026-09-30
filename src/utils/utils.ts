@@ -14,21 +14,25 @@ import Big from 'big.js';
 import { RetentionsSalary } from '../models/RetentionsSalary.ts';
 import { Period } from '../models/Period.ts';
 import { CurrencyYearSalaries } from '../models/YearSalaries.ts';
+import { deleteIdbValue, getIdbValue, migrateLocalStorageKey, setIdbValue } from './indexedDb.ts';
 
 export const getStorageKey = (periodType: PeriodType) => {
   return `periods-${ periodType }`;
 };
 
-export const getStorage = (periodType: PeriodType) => {
+export const getStorage = async (periodType: PeriodType): Promise<Record<Month, Period> | null> => {
   const storageKey = getStorageKey(periodType);
-  const storedPeriods = localStorage.getItem(storageKey);
+  await migrateLocalStorageKey<Record<Month, Period>>(storageKey);
 
-  return storedPeriods ? JSON.parse(storedPeriods) : null;
+  return getIdbValue<Record<Month, Period>>(storageKey);
 };
 
 export const setStorage = (periodType: PeriodType, periods: Record<Month, Period>) => {
-  const storageKey = getStorageKey(periodType);
-  localStorage.setItem(storageKey, JSON.stringify(periods));
+  return setIdbValue(getStorageKey(periodType), periods);
+};
+
+export const removeStorage = (periodType: PeriodType) => {
+  return deleteIdbValue(getStorageKey(periodType));
 };
 
 export const getBaseSalary = (salary: number): number => {
@@ -149,11 +153,9 @@ export const getNetSalary = (salary: number, bonus: number, exemptAccumulate: nu
   return Big(salary).plus(bonus).minus(totalRetentions).minus(tax).toNumber();
 };
 
-export const getBasePeriods = (periodType: PeriodType) => {
-  const storedPeriods = getStorage(periodType);
-
+export const getDefaultPeriods = (periodType: PeriodType): Record<Month, Period> => {
   let exemptAccumulate = 0;
-  return storedPeriods || MONTHS.reduce<Record<Month, Period>>((periods, month) => {
+  return MONTHS.reduce<Record<Month, Period>>((periods, month) => {
     const salaryUsd = periodType === PeriodType.USD ? 3000 : 0;
     const trm = periodType === PeriodType.USD ? 4000 : 0;
 
@@ -188,13 +190,23 @@ export const getBasePeriods = (periodType: PeriodType) => {
   }, {} as unknown as Record<Month, Period>);
 };
 
-export const getBasePeriodsAll = (): CurrencyYearSalaries => {
-  return [PeriodType.COP, PeriodType.USD].reduce((periods, periodType) => {
+export const getBasePeriods = async (periodType: PeriodType): Promise<Record<Month, Period>> => {
+  const storedPeriods = await getStorage(periodType);
+
+  return storedPeriods ?? getDefaultPeriods(periodType);
+};
+
+export const getBasePeriodsAll = async (): Promise<CurrencyYearSalaries> => {
+  const entries = await Promise.all(
+    [PeriodType.COP, PeriodType.USD].map(async (periodType) => [periodType, await getBasePeriods(periodType)] as const)
+  );
+
+  return entries.reduce((periods, [periodType, periodData]) => {
     return {
       ...periods,
-      [periodType]: getBasePeriods(periodType)
+      [periodType]: periodData
     };
-  }, {});
+  }, {} as CurrencyYearSalaries);
 };
 
 export const getBasePeriodsUsd = () => {
