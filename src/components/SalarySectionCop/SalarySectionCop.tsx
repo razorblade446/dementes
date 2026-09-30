@@ -31,6 +31,7 @@ export default function SalarySectionCop() {
   };
 
   const showPrima = Object.values(periods).some((period) => !isIntegralSalary(period.salaryCop));
+  const showDeductions = Object.values(periods).some((period) => period.deductions > 0);
 
   return (
       <section className="flex flex-col flex-wrap justify-between p-8 shadow-xl bg-white bg-opacity-65">
@@ -44,6 +45,7 @@ export default function SalarySectionCop() {
             <th scope="col" className="max-w-[200px]">Bono COP</th>
             <th scope="col">Salario Base</th>
             { showPrima && <th scope="col">Prima</th> }
+            { showDeductions && <th scope="col">Deducciones</th> }
             <th scope="col" className="break-word">Retenciones<br/>Salariales</th>
             <th scope="col">Retefuente</th>
             <th scope="col">Salario Neto</th>
@@ -54,7 +56,7 @@ export default function SalarySectionCop() {
           { Object.entries(periods).map(([_k, period]) => (
               <SalaryPeriod periodType={ PeriodType.COP } period={ period } periods={ periods }
                             updatePeriod={ updatePeriod } handleCopySalary={ handleCopySalary }
-                            showPrima={ showPrima } key={ period.month }/>
+                            showPrima={ showPrima } showDeductions={ showDeductions } key={ period.month }/>
           )) }
 
           </tbody>

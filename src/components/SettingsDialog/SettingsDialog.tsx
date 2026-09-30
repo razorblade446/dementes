@@ -13,8 +13,9 @@ import {
 } from '../ui/dialog.tsx';
 import { Input } from '../ui/input.tsx';
 import { Label } from '../ui/label.tsx';
+import { Checkbox } from '../ui/checkbox.tsx';
 import { getSettings, setSettings } from '../../utils/settings.ts';
-import { recalculateAutomaticTrmPeriods } from '../../utils/utils.ts';
+import { recalculateAutomaticTrmPeriods, recalculateStoredCopPeriods } from '../../utils/utils.ts';
 import { DEFAULT_TRM_REFERENCE_DAY, PRIMA_TAX_METHOD, PrimaTaxMethod } from '../../constants/constants.ts';
 import { EventBus } from '../../services/EventBus.ts';
 
@@ -28,19 +29,24 @@ const PRIMA_TAX_METHOD_LABELS: Record<PrimaTaxMethod, string> = {
 export default function SettingsDialog() {
   const [open, setOpen] = useState(false);
   const [trmReferenceDay, setTrmReferenceDay] = useState(DEFAULT_TRM_REFERENCE_DAY);
+  const [hasDependents, setHasDependents] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (open) {
-      getSettings().then((settings) => setTrmReferenceDay(settings.trmReferenceDay));
+      getSettings().then((settings) => {
+        setTrmReferenceDay(settings.trmReferenceDay);
+        setHasDependents(settings.hasDependents);
+      });
     }
   }, [open]);
 
   const handleSave = async () => {
     setSaving(true);
 
-    await setSettings({ trmReferenceDay });
-    await recalculateAutomaticTrmPeriods(trmReferenceDay);
+    await setSettings({ trmReferenceDay, hasDependents });
+    await recalculateAutomaticTrmPeriods(trmReferenceDay, hasDependents);
+    await recalculateStoredCopPeriods(hasDependents);
 
     eventBus.publish('settingsUpdated', null);
 
@@ -77,6 +83,21 @@ export default function SettingsDialog() {
                 value={ trmReferenceDay }
                 onChange={ (e) => setTrmReferenceDay(Number(e.target.value)) }
                 className="text-sm md:text-sm" />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                  id="has-dependents"
+                  checked={ hasDependents }
+                  onCheckedChange={ setHasDependents } />
+              <Label htmlFor="has-dependents" className="text-sm">Declaro dependientes económicos</Label>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Deducción por dependientes (Art. 387 E.T.): 10% del ingreso laboral bruto mensual,
+              con tope de 32 UVT/mes. Aplica si hijos, cónyuge/compañero(a), padres o hermanos
+              califican como dependientes económicos.
+            </p>
           </div>
 
           <div className="flex flex-col gap-1">

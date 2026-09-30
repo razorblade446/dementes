@@ -37,3 +37,9 @@ export enum PrimaTaxMethod {
 
 // Hardcoded until the settings panel/modal exists to let the user choose.
 export const PRIMA_TAX_METHOD: PrimaTaxMethod = PrimaTaxMethod.PROCEDIMIENTO_1;
+
+// Deducción por dependientes (Art. 387 E.T., docs/tax.md §1) — flat, doesn't scale with dependent
+// count: 10% of gross monthly labor income (baseSalary + bonus), capped at 32 UVT/month.
+export const DEPENDENTS_DEDUCTION_RATE = 0.10;
+export const DEPENDENTS_UVT_LIMIT = 32;
+export const DEPENDENTS_UVT_LIMIT_DEDUCTION = UVT * DEPENDENTS_UVT_LIMIT;

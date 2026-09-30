@@ -11,6 +11,7 @@ export interface Period {
   bonusCop: number;
   baseSalary: number;
   retentions: RetentionsSalary;
+  deductions: number;
   prima: number;
   tax: number;
   netSalary: number;

@@ -33,6 +33,39 @@ exemption = min(trialExempt, remainingExempt)
 
 `exemptAccumulate` is threaded month-to-month by the caller (`getBasePeriods()`); this function does not reset per month on its own.
 
+### Deducción por dependientes (Art. 387 E.T.)
+
+`getDependentsDeduction()` (utils.ts). Lets a worker deduct, from the monthly retención en la fuente base, up to **10% of that month's gross labor income, capped at 32 UVT per month** (≈1,675,968 COP at 2026's UVT), provided the worker has at least one qualifying dependent. Unlike Art. 336's separate annual per-dependent deduction (declaración de renta only, 72 UVT × up to 4 dependents — **out of scope**, this calculator only models monthly retención), Art. 387's amount does not scale with dependent count: it is a flat percentage/UVT ceiling that applies once at least one dependent qualifies.
+
+```
+grossLaborIncome = baseSalary + bonus            // same inputs as §1 exemption, before retentions
+dependentsDeductionRaw = grossLaborIncome × 0.10
+dependentsDeduction = min(dependentsDeductionRaw, 32 × UVT)   // per-month cap, no annual accumulator
+```
+
+`DEPENDENTS_DEDUCTION_RATE` (0.10) and `DEPENDENTS_UVT_LIMIT_DEDUCTION` (32 × UVT) in `constants.ts`.
+
+**Qualifying dependents** (any one is sufficient to claim the deduction):
+- Children up to age 18, no income restriction.
+- Children 18–25 while the taxpayer finances their formal higher education or accredited technical/technological studies.
+- Children over 18 with certified physical/psychological dependence (Medicina Legal).
+- Spouse or permanent partner with no income, or annual income under 260 UVT (certified by a public accountant), or with certified physical/psychological dependence.
+- Parents and siblings under the same 260-UVT/year income threshold, or with certified physical/psychological dependence.
+
+**Order in the depuración (Art. 388 E.T.)**: deductions under Art. 387 (dependents, and others this calculator doesn't model: housing-credit interest ≤100 UVT/month, prepaid health ≤16 UVT/month, etc.) are subtracted **before** the §1 25% exemption is computed — the exemption applies to what remains after deductions, not to gross income. `getTaxExemption()` and `getTaxableSalary()` take `dependentsDeduction` as a parameter (default 0) and apply it accordingly:
+
+```
+baseAfterDeductions = (salary − retentions) + bonus − dependentsDeduction
+trialExempt = baseAfterDeductions × 0.25          // was (salary − retentions + bonus) × 0.25
+taxableSalary = baseAfterDeductions − exemption
+```
+
+**Combined 40%/1340-UVT limit (Art. 388 parágrafo)**: the sum of all Art. 387 deductions plus the §1 25% exemption cannot exceed 40% of (salary − retentions), nor 1,340 UVT accumulated annually. For this calculator's scope (only the 25% exemption and the dependents deduction, no housing/health/AFC items), that combined ceiling is **structurally non-binding and does not need its own accumulator**: the two items' own caps already bound them at ≤25%+10% = 35% of base (under 40%) and ≤790+384 = 1,174 UVT/year (under 1,340 UVT) — the 40%/1340-UVT check would only ever matter if a future item (housing interest, prepaid health, voluntary pension) is added on top. Not implemented, per this finding.
+
+**Eligibility input**: a single global `Settings.hasDependents` boolean (`src/models/Settings.ts`, set via `SettingsDialog`), not a per-month `Period` field — the underlying legal fact (does the taxpayer have a qualifying dependent) is a taxpayer-level fact, not something that varies month to month in this calculator's model. Saving the setting recomputes and persists all stored periods for both currencies (`recalculateAutomaticTrmPeriods()` for USD, `recalculateStoredCopPeriods()` for COP).
+
+**UI**: `Period.deductions` holds the monthly amount (only this one deduction type today). The "Deducciones" column in `SalarySectionCop`/`SalarySectionUsd` is gated on `showDeductions` (shown only if at least one month has `deductions > 0`), matching the existing `showPrima` pattern. A hover tooltip on the cell (`SalaryPeriod.tsx`) names the deduction, its rate, and its cap.
+
 ## 2. Retentions
 
 `getSalaryRetentions()` (utils.ts:74-80), each computed on `baseSalary` from §1:
@@ -77,7 +110,7 @@ tax(bracket) = (salaryUvt − bracketFloorUvt) × rate + offsetUvt) × UVT
 ```
 rounded to the nearest 1000 COP.
 
-`taxableSalary` itself (`getTaxableSalary()`, utils.ts:105-113) = (salary − retentions) + bonus − exemption (§1).
+`taxableSalary` itself (`getTaxableSalary()`, utils.ts:105-113) = (salary − retentions) + bonus − exemption (§1). Once the dependents deduction (§1) is implemented, this becomes (salary − retentions) + bonus − dependentsDeduction − exemption, per Art. 388's subtract-deductions-before-exemption order.
 
 This bracket table is also referred to below as "the Art. 383 table" — it is the same lookup DIAN calls "tabla de retención" for both Procedimiento 1 (§5) and Procedimiento 2 (§5).
 
@@ -203,3 +236,5 @@ No health/retirement/solidarity retention line applies to the `prima` term under
 - 2026-09-30 — §5 documented both DIAN-sanctioned withholding methods (Procedimiento 1 independent calc, Procedimiento 2 fixed semestral percentage) so the user can be offered a choice of method at implementation time. Reordered sections so TRM (§4) precedes Prima (§5).
 - 2026-09-30 — §5 Method A (Procedimiento 1) implemented: `Period.prima`, `getPrima()`/`getSemesterAvgBaseSalary()`/`getPrimaExemption()`/`getPrimaTax()` in `utils.ts`, wired into `getDefaultPeriods()` and `SalaryProvider.updatePeriod()`; UI shows a Prima column (SalarySectionCop/Usd, SalaryPeriod) gated on at least one non-integral month, with a hover tooltip showing the semester average base salary. Selectable via `PRIMA_TAX_METHOD` in `constants.ts`.
 - 2026-09-30 — Fixed `$NaN` rendering for `prima` (and future fields) on periods loaded from storage written before this feature: extracted the per-month recompute into a shared `recalculatePeriods()`, now also run by `getBasePeriods()` on stored data, instead of returning stored periods verbatim.
+- 2026-09-30 — Added §1 deducción por dependientes (research: Art. 387 E.T. 10%/32-UVT-monthly cap, qualifying-dependent criteria, Art. 388 subtract-before-exemption ordering, and why the combined 40%/1340-UVT limit is non-binding for this calculator's scope). Documentation only — not yet implemented.
+- 2026-09-30 — §1 deducción por dependientes implemented: `getDependentsDeduction()` in `utils.ts`, `Settings.hasDependents` (global, set via `SettingsDialog`) rather than a per-month `Period` field, `getTaxExemption()`/`getTaxableSalary()` updated to subtract it before the 25% exemption (Art. 388 ordering), `Period.deductions` added. UI shows a "Deducciones" column (SalarySectionCop/Usd, SalaryPeriod) gated on at least one month with `deductions > 0`, with a hover tooltip naming the deduction, its rate, and its cap.
