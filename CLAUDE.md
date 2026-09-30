@@ -40,5 +40,7 @@ Known gap: `getTaxExemption()` has a `// TODO: test for values less than 0` (uti
 
 Living section — add a dated entry here whenever a notable change lands, so this file stays a running record of where the calculator is and what's next. The `add-changelog-entry` skill (`.claude/skills/add-changelog-entry/`) automates appending to this section.
 
+- 2026-09-30 — Split TRM into automatic (`Period.trm`) and manual override (`Period.manualTrm`, null by default) fields; `getEffectiveTrm()` resolves `manualTrm ?? trm` for calculations, with a restore icon (shown only on overridden months) to clear the override back to the automatic rate.
+- 2026-09-30 — Added automatic official-TRM fetch for default USD periods (`src/services/trm.ts`, `TRM_REFERENCE_DAY` = day 10 in constants.ts, wired via `getDefaultPeriodsWithOfficialTrm()`); manual TRM entry still overrides once a period is stored.
 - 2026-09-30 — Added `docs/tax.md` (deductions/retentions/tax-bracket reference, imported into this file) and a Vitest suite for `src/utils/utils.ts` (28 tests, `npm run test`).
 - 2026-01-23 — UVT/minimum-salary constants updated for 2026; added optional bonus columns to the period table.

@@ -5,6 +5,7 @@ import {
   getBasePeriodsAll,
   getBaseSalary,
   getDefaultPeriods,
+  getEffectiveTrm,
   getHealthContribution,
   getNetSalary,
   getRetirementContribution,
@@ -301,7 +302,26 @@ describe('getDefaultPeriods', () => {
 
     expect(periods.Enero.salaryUsd).toBe(3000);
     expect(periods.Enero.trm).toBe(4000);
+    expect(periods.Enero.manualTrm).toBeNull();
     expect(periods.Enero.salaryCop).toBe(12000000);
+  });
+
+  it('includes the bonus in netSalary, matching the formula SalaryProvider uses on updates', () => {
+    const periods = getDefaultPeriods(PeriodType.COP);
+    const { salaryCop, bonusCop, tax, retentions } = periods.Enero;
+    const netSalaryRetentions = retentions.health + retentions.retirement + (retentions.solidarity ?? 0);
+
+    expect(periods.Enero.netSalary).toBe(salaryCop + bonusCop - netSalaryRetentions - tax);
+  });
+});
+
+describe('getEffectiveTrm', () => {
+  it('uses the automatic trm when no manual override is set', () => {
+    expect(getEffectiveTrm({ trm: 4000, manualTrm: null })).toBe(4000);
+  });
+
+  it('prefers the manual override over the automatic trm', () => {
+    expect(getEffectiveTrm({ trm: 4000, manualTrm: 4200 })).toBe(4200);
   });
 });
 
@@ -318,13 +338,34 @@ describe('getBasePeriods', () => {
     const result = await getBasePeriods(PeriodType.COP);
     expect(result.Enero.salaryCop).toBe(999999);
   });
+
+  it('fetches the official TRM for USD defaults when nothing is stored', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve([{ valor: '4321.5' }])
+    }));
+
+    const result = await getBasePeriods(PeriodType.USD);
+
+    expect(result.Enero.trm).toBe(4321.5);
+    expect(result.Enero.salaryCop).toBe(getDefaultPeriods(PeriodType.USD, { Enero: 4321.5 }).Enero.salaryCop);
+
+    vi.unstubAllGlobals();
+  });
 });
 
 describe('getBasePeriodsAll', () => {
   it('returns defaults for both period types keyed by period type', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve([{ valor: '4000' }])
+    }));
+
     const result = await getBasePeriodsAll();
 
     expect(result[PeriodType.COP]).toEqual(getDefaultPeriods(PeriodType.COP));
     expect(result[PeriodType.USD]).toEqual(getDefaultPeriods(PeriodType.USD));
+
+    vi.unstubAllGlobals();
   });
 });

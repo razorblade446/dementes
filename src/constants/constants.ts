@@ -23,3 +23,6 @@ export const MINIMUM_SOLIDARY_RETIREMENT = 4 * MINIMUM_SALARY;
 
 export const HEALTH_CONTRIBUTION = 0.04;
 export const RETIREMENT_CONTRIBUTION = 0.04;
+
+// Day of the month whose official TRM (Colombian USD exchange rate) is used for that month's calculation.
+export const TRM_REFERENCE_DAY = 10;
