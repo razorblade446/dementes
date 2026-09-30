@@ -1,19 +1,29 @@
-import { describe, expect, it } from 'vitest';
+import 'fake-indexeddb/auto';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  getBasePeriods,
+  getBasePeriodsAll,
   getBaseSalary,
+  getDefaultPeriods,
   getHealthContribution,
   getNetSalary,
   getRetirementContribution,
   getSalaryRetentions,
   getSolidaryRetirement,
+  getStorage,
+  getStorageKey,
   getTax,
   getTaxableSalary,
-  getTaxExemption
+  getTaxExemption,
+  removeStorage,
+  setStorage
 } from './utils.ts';
 import {
   HEALTH_CONTRIBUTION,
   INTEGRAL_LIMIT,
   MINIMUM_SALARY,
+  MONTHS,
+  PeriodType,
   RETIREMENT_CONTRIBUTION,
   UVT,
   UVT_LIMIT_EXEMPTION
@@ -209,5 +219,112 @@ describe('constants used in this file', () => {
   it('UVT and MINIMUM_SALARY have the expected 2026 values', () => {
     expect(UVT).toBe(52374);
     expect(MINIMUM_SALARY).toBe(1750905);
+  });
+});
+
+const createLocalStorageStub = () => {
+  const store = new Map<string, string>();
+
+  return {
+    getItem: (key: string) => (store.has(key) ? store.get(key)! : null),
+    setItem: (key: string, value: string) => {
+      store.set(key, value);
+    },
+    removeItem: (key: string) => {
+      store.delete(key);
+    }
+  };
+};
+
+beforeEach(async () => {
+  vi.stubGlobal('localStorage', createLocalStorageStub());
+  // fake-indexeddb's store is shared (module-level) across every test in this
+  // file, so wipe it before each test to keep storage tests independent.
+  await removeStorage(PeriodType.COP);
+  await removeStorage(PeriodType.USD);
+});
+
+describe('getStorageKey', () => {
+  it('namespaces the key by period type', () => {
+    expect(getStorageKey(PeriodType.COP)).toBe('periods-COP');
+    expect(getStorageKey(PeriodType.USD)).toBe('periods-USD');
+  });
+});
+
+describe('getStorage / setStorage / removeStorage', () => {
+  it('returns null when nothing has been stored for that period type', async () => {
+    expect(await getStorage(PeriodType.COP)).toBeNull();
+  });
+
+  it('round-trips periods written with setStorage', async () => {
+    const periods = getDefaultPeriods(PeriodType.COP);
+    await setStorage(PeriodType.COP, periods);
+
+    expect(await getStorage(PeriodType.COP)).toEqual(periods);
+  });
+
+  it('clears the stored value with removeStorage', async () => {
+    const periods = getDefaultPeriods(PeriodType.USD);
+    await setStorage(PeriodType.USD, periods);
+    await removeStorage(PeriodType.USD);
+
+    expect(await getStorage(PeriodType.USD)).toBeNull();
+  });
+
+  it('migrates a legacy localStorage value on first read and removes the legacy key', async () => {
+    const legacyPeriods = getDefaultPeriods(PeriodType.COP);
+    localStorage.setItem(getStorageKey(PeriodType.COP), JSON.stringify(legacyPeriods));
+
+    expect(await getStorage(PeriodType.COP)).toEqual(legacyPeriods);
+    expect(localStorage.getItem(getStorageKey(PeriodType.COP))).toBeNull();
+  });
+});
+
+describe('getDefaultPeriods', () => {
+  it('builds one entry per month', () => {
+    const periods = getDefaultPeriods(PeriodType.COP);
+
+    expect(Object.keys(periods)).toEqual(MONTHS as unknown as string[]);
+  });
+
+  it('defaults COP periods to a 12,000,000 salary with no USD/TRM fields', () => {
+    const periods = getDefaultPeriods(PeriodType.COP);
+
+    expect(periods.Enero.salaryCop).toBe(12000000);
+    expect(periods.Enero.bonusCop).toBe(5200000);
+    expect(periods.Enero.salaryUsd).toBe(0);
+    expect(periods.Enero.trm).toBe(0);
+  });
+
+  it('defaults USD periods to a 3,000 USD salary converted at the default TRM', () => {
+    const periods = getDefaultPeriods(PeriodType.USD);
+
+    expect(periods.Enero.salaryUsd).toBe(3000);
+    expect(periods.Enero.trm).toBe(4000);
+    expect(periods.Enero.salaryCop).toBe(12000000);
+  });
+});
+
+describe('getBasePeriods', () => {
+  it('returns the defaults when nothing is stored', async () => {
+    expect(await getBasePeriods(PeriodType.COP)).toEqual(getDefaultPeriods(PeriodType.COP));
+  });
+
+  it('returns the stored periods when present, instead of the defaults', async () => {
+    const stored = getDefaultPeriods(PeriodType.COP);
+    stored.Enero.salaryCop = 999999;
+    await setStorage(PeriodType.COP, stored);
+
+    const result = await getBasePeriods(PeriodType.COP);
+    expect(result.Enero.salaryCop).toBe(999999);
+  });
+});
+
+describe('getBasePeriodsAll', () => {
+  it('returns defaults for both period types keyed by period type', async () => {
+    const result = await getBasePeriodsAll();
+
+    expect(result[PeriodType.COP]).toEqual(getDefaultPeriods(PeriodType.COP));
+    expect(result[PeriodType.USD]).toEqual(getDefaultPeriods(PeriodType.USD));
   });
 });
