@@ -10,7 +10,7 @@ import SalarySectionCop from './components/SalarySectionCop/SalarySectionCop.tsx
 
 createRoot(document.getElementById('root')!).render(
     <StrictMode>
-      <BrowserRouter basename="/dementes">
+      <BrowserRouter basename={ import.meta.env.BASE_URL.replace(/\/$/, '') }>
         <Routes>
           <Route path="/" element={ <App/> }>
             <Route path="usd"
