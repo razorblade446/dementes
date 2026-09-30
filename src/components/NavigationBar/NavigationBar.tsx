@@ -1,5 +1,6 @@
 import { NavLink, NavLinkRenderProps } from 'react-router';
 import { EventBus } from '../../services/EventBus.ts';
+import SettingsDialog from '../SettingsDialog/SettingsDialog.tsx';
 
 const githubImgUrl = new URL('/github-mark.svg', import.meta.url).href;
 
@@ -28,6 +29,7 @@ export default function NavigationBar() {
             <a className="py-4" href="https://github.com/razorblade446/dementes" target="_blank" title="Repositorio Github">
               <img className="w-6 h-6" src={ githubImgUrl } alt="Github"/>
             </a>
+            <SettingsDialog/>
           </div>
           <div className="items-stretch justify-between w-auto flex order-1">
             <ul className="flex flex-row font-medium text-gray-900 space-x-8">

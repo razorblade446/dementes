@@ -1,4 +1,4 @@
-import { Month, MONTHS, TRM_REFERENCE_DAY } from '../constants/constants.ts';
+import { Month, MONTHS } from '../constants/constants.ts';
 
 // Banco de la República's official TRM dataset, published on the government open-data portal.
 const TRM_ENDPOINT = 'https://www.datos.gov.co/resource/32sa-8pi3.json';
@@ -29,15 +29,15 @@ export const fetchOfficialTrm = async (date: Date): Promise<number> => {
   return parseFloat(data[0].valor);
 };
 
-export const getOfficialTrmForMonth = (year: number, monthIndex: number): Promise<number> => {
-  const referenceDate = new Date(Date.UTC(year, monthIndex, TRM_REFERENCE_DAY));
+export const getOfficialTrmForMonth = (year: number, monthIndex: number, referenceDay: number): Promise<number> => {
+  const referenceDate = new Date(Date.UTC(year, monthIndex, referenceDay));
 
   return fetchOfficialTrm(referenceDate);
 };
 
-export const getOfficialTrmByMonth = async (year: number): Promise<Record<Month, number>> => {
+export const getOfficialTrmByMonth = async (year: number, referenceDay: number): Promise<Record<Month, number>> => {
   const entries = await Promise.all(
-    MONTHS.map(async (month, monthIndex) => [month, await getOfficialTrmForMonth(year, monthIndex)] as const)
+    MONTHS.map(async (month, monthIndex) => [month, await getOfficialTrmForMonth(year, monthIndex, referenceDay)] as const)
   );
 
   return entries.reduce((trms, [month, trm]) => {

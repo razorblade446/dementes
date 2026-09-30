@@ -1,14 +1,19 @@
 const DB_NAME = 'dementes-db';
-const DB_VERSION = 1;
-const STORE_NAME = 'periods';
+const DB_VERSION = 2;
+const PERIODS_STORE_NAME = 'periods';
+export const SETTINGS_STORE_NAME = 'settings';
 
 const openDb = (): Promise<IDBDatabase> => {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
 
     request.onupgradeneeded = () => {
-      if (!request.result.objectStoreNames.contains(STORE_NAME)) {
-        request.result.createObjectStore(STORE_NAME);
+      if (!request.result.objectStoreNames.contains(PERIODS_STORE_NAME)) {
+        request.result.createObjectStore(PERIODS_STORE_NAME);
+      }
+
+      if (!request.result.objectStoreNames.contains(SETTINGS_STORE_NAME)) {
+        request.result.createObjectStore(SETTINGS_STORE_NAME);
       }
     };
 
@@ -17,36 +22,36 @@ const openDb = (): Promise<IDBDatabase> => {
   });
 };
 
-export const getIdbValue = async <T>(key: string): Promise<T | null> => {
+export const getIdbValue = async <T>(key: string, storeName: string = PERIODS_STORE_NAME): Promise<T | null> => {
   const db = await openDb();
 
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readonly');
-    const request = tx.objectStore(STORE_NAME).get(key);
+    const tx = db.transaction(storeName, 'readonly');
+    const request = tx.objectStore(storeName).get(key);
 
     request.onsuccess = () => resolve((request.result as T) ?? null);
     request.onerror = () => reject(request.error);
   });
 };
 
-export const setIdbValue = async <T>(key: string, value: T): Promise<void> => {
+export const setIdbValue = async <T>(key: string, value: T, storeName: string = PERIODS_STORE_NAME): Promise<void> => {
   const db = await openDb();
 
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    tx.objectStore(STORE_NAME).put(value, key);
+    const tx = db.transaction(storeName, 'readwrite');
+    tx.objectStore(storeName).put(value, key);
 
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
 };
 
-export const deleteIdbValue = async (key: string): Promise<void> => {
+export const deleteIdbValue = async (key: string, storeName: string = PERIODS_STORE_NAME): Promise<void> => {
   const db = await openDb();
 
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    tx.objectStore(STORE_NAME).delete(key);
+    const tx = db.transaction(storeName, 'readwrite');
+    tx.objectStore(storeName).delete(key);
 
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);

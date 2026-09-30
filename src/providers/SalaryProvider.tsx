@@ -11,6 +11,9 @@ import {
 } from '../utils/utils.ts';
 import { ISalaryContext, SalaryContextBuilder } from '../contexts/SalaryContext.ts';
 import { CurrencyYearSalaries, YearSalaries } from '../models/YearSalaries.ts';
+import { EventBus } from '../services/EventBus.ts';
+
+const eventBus = EventBus.getInstance();
 
 type PeriodsFn = (oldPeriods: YearSalaries) => YearSalaries;
 
@@ -28,6 +31,16 @@ export const SalaryProvider = ({ periodType, children }: PropsWithChildren & { p
 
   useEffect(() => {
     getBasePeriodsAll().then(setPeriodsAll);
+
+    const settingsUpdatedHandler = () => {
+      getBasePeriodsAll().then(setPeriodsAll);
+    };
+
+    eventBus.subscribe('settingsUpdated', settingsUpdatedHandler);
+
+    return () => {
+      eventBus.unsubscribe('settingsUpdated', settingsUpdatedHandler);
+    };
   }, []);
 
   const setPeriods = useCallback((periodsArg: PeriodsFn | CurrencyYearSalaries) => {
