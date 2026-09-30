@@ -59,7 +59,7 @@ describe('getOfficialTrmForMonth', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    await getOfficialTrmForMonth(2026, 2);
+    await getOfficialTrmForMonth(2026, 2, 10);
 
     expect(fetchMock.mock.calls[0][0]).toContain('2026-03-10');
   });
@@ -72,7 +72,7 @@ describe('getOfficialTrmByMonth', () => {
       json: () => Promise.resolve([{ valor: '4500' }])
     }));
 
-    const trms = await getOfficialTrmByMonth(2026);
+    const trms = await getOfficialTrmByMonth(2026, 10);
 
     expect(Object.keys(trms)).toEqual(MONTHS as unknown as string[]);
     expect(trms.Enero).toBe(4500);

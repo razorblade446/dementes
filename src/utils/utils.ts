@@ -17,7 +17,8 @@ import { RetentionsSalary } from '../models/RetentionsSalary.ts';
 import { Period } from '../models/Period.ts';
 import { CurrencyYearSalaries } from '../models/YearSalaries.ts';
 import { deleteIdbValue, getIdbValue, migrateLocalStorageKey, setIdbValue } from './indexedDb.ts';
-import { getOfficialTrmByMonth } from '../services/trm.ts';
+import { getOfficialTrmByMonth, getOfficialTrmForMonth } from '../services/trm.ts';
+import { getSettings } from './settings.ts';
 
 const DEFAULT_TRM = 4000;
 
@@ -318,9 +319,39 @@ export const getDefaultPeriodsWithOfficialTrm = async (periodType: PeriodType): 
     return getDefaultPeriods(periodType);
   }
 
-  const trmByMonth = await getOfficialTrmByMonth(new Date().getFullYear());
+  const { trmReferenceDay } = await getSettings();
+  const trmByMonth = await getOfficialTrmByMonth(new Date().getFullYear(), trmReferenceDay);
 
   return getDefaultPeriods(periodType, trmByMonth);
+};
+
+// Re-fetches the official TRM (using the given reference day) for every stored USD month that
+// has no manual override, then recomputes and persists that month — months with a manual
+// override (Period.manualTrm) are left untouched, per Settings' TRM reference-day behavior.
+export const recalculateAutomaticTrmPeriods = async (referenceDay: number): Promise<void> => {
+  const storedPeriods = await getStorage(PeriodType.USD);
+
+  if (!storedPeriods) {
+    return;
+  }
+
+  const year = new Date().getFullYear();
+  const updatedPeriods = { ...storedPeriods };
+
+  for (const month of MONTHS) {
+    const period = updatedPeriods[month];
+
+    if (period.manualTrm === null) {
+      const monthIndex = MONTHS.indexOf(month);
+      const trm = await getOfficialTrmForMonth(year, monthIndex, referenceDay);
+
+      updatedPeriods[month] = { ...period, trm };
+    }
+  }
+
+  const newPeriods = recalculatePeriods(PeriodType.USD, updatedPeriods);
+
+  await setStorage(PeriodType.USD, newPeriods);
 };
 
 export const getBasePeriods = async (periodType: PeriodType): Promise<Record<Month, Period>> => {

@@ -24,8 +24,10 @@ export const MINIMUM_SOLIDARY_RETIREMENT = 4 * MINIMUM_SALARY;
 export const HEALTH_CONTRIBUTION = 0.04;
 export const RETIREMENT_CONTRIBUTION = 0.04;
 
-// Day of the month whose official TRM (Colombian USD exchange rate) is used for that month's calculation.
-export const TRM_REFERENCE_DAY = 10;
+// Default day of the month whose official TRM (Colombian USD exchange rate) is used for that
+// month's calculation. User-overridable via Settings (src/models/Settings.ts); this stays the
+// fallback for a first run with nothing stored in IndexedDB yet.
+export const DEFAULT_TRM_REFERENCE_DAY = 10;
 
 // DIAN-sanctioned methods for withholding tax on prima de servicios (docs/tax.md §5).
 export enum PrimaTaxMethod {
