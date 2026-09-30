@@ -6,6 +6,7 @@ export interface Period {
   salaryUsd: number;
   salaryCop: number;
   trm: number;
+  manualTrm: number | null;
   bonusUsd: number;
   bonusCop: number;
   baseSalary: number;

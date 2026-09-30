@@ -15,6 +15,9 @@ import { RetentionsSalary } from '../models/RetentionsSalary.ts';
 import { Period } from '../models/Period.ts';
 import { CurrencyYearSalaries } from '../models/YearSalaries.ts';
 import { deleteIdbValue, getIdbValue, migrateLocalStorageKey, setIdbValue } from './indexedDb.ts';
+import { getOfficialTrmByMonth } from '../services/trm.ts';
+
+const DEFAULT_TRM = 4000;
 
 export const getStorageKey = (periodType: PeriodType) => {
   return `periods-${ periodType }`;
@@ -153,11 +156,14 @@ export const getNetSalary = (salary: number, bonus: number, exemptAccumulate: nu
   return Big(salary).plus(bonus).minus(totalRetentions).minus(tax).toNumber();
 };
 
-export const getDefaultPeriods = (periodType: PeriodType): Record<Month, Period> => {
+export const getDefaultPeriods = (
+  periodType: PeriodType,
+  trmByMonth?: Partial<Record<Month, number>>
+): Record<Month, Period> => {
   let exemptAccumulate = 0;
   return MONTHS.reduce<Record<Month, Period>>((periods, month) => {
     const salaryUsd = periodType === PeriodType.USD ? 3000 : 0;
-    const trm = periodType === PeriodType.USD ? 4000 : 0;
+    const trm = periodType === PeriodType.USD ? (trmByMonth?.[month] ?? DEFAULT_TRM) : 0;
 
     const salaryCop = periodType === PeriodType.USD ? Big(salaryUsd).times(trm).toNumber() : 12000000;
 
@@ -169,7 +175,7 @@ export const getDefaultPeriods = (periodType: PeriodType): Record<Month, Period>
     const netSalaryRetentions = getNetSalaryRetentions(salaryCop);
     const tax = getTax(salaryCop, bonusCop, exemptAccumulate);
 
-    const netSalary = Big(salaryCop).minus(netSalaryRetentions).minus(tax).toNumber();
+    const netSalary = Big(salaryCop).plus(bonusCop).minus(netSalaryRetentions).minus(tax).toNumber();
 
     periods[month] = {
       month,
@@ -178,6 +184,7 @@ export const getDefaultPeriods = (periodType: PeriodType): Record<Month, Period>
       bonusUsd,
       bonusCop,
       trm,
+      manualTrm: null,
       baseSalary,
       retentions,
       tax,
@@ -190,10 +197,20 @@ export const getDefaultPeriods = (periodType: PeriodType): Record<Month, Period>
   }, {} as unknown as Record<Month, Period>);
 };
 
+export const getDefaultPeriodsWithOfficialTrm = async (periodType: PeriodType): Promise<Record<Month, Period>> => {
+  if (periodType !== PeriodType.USD) {
+    return getDefaultPeriods(periodType);
+  }
+
+  const trmByMonth = await getOfficialTrmByMonth(new Date().getFullYear());
+
+  return getDefaultPeriods(periodType, trmByMonth);
+};
+
 export const getBasePeriods = async (periodType: PeriodType): Promise<Record<Month, Period>> => {
   const storedPeriods = await getStorage(periodType);
 
-  return storedPeriods ?? getDefaultPeriods(periodType);
+  return storedPeriods ?? getDefaultPeriodsWithOfficialTrm(periodType);
 };
 
 export const getBasePeriodsAll = async (): Promise<CurrencyYearSalaries> => {
@@ -215,6 +232,10 @@ export const getBasePeriodsUsd = () => {
 
 export const getBasePeriodsCop = () => {
   return getBasePeriods(PeriodType.COP);
+};
+
+export const getEffectiveTrm = (period: Pick<Period, 'trm' | 'manualTrm'>): number => {
+  return period.manualTrm ?? period.trm;
 };
 
 export const financial = (value: number): string => {

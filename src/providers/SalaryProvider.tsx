@@ -5,6 +5,8 @@ import {
   getBasePeriodsAll,
   getBaseSalary,
   getDefaultPeriods,
+  getDefaultPeriodsWithOfficialTrm,
+  getEffectiveTrm,
   getNetSalaryRetentions,
   getSalaryRetentions,
   getTax,
@@ -63,9 +65,11 @@ export const SalaryProvider = ({ periodType, children }: PropsWithChildren & { p
           const salaryUsd = periodType === PeriodType.USD ? currentMonth.salaryUsd : 0;
           const bonusUsd = periodType === PeriodType.USD ? currentMonth.bonusUsd : 0;
           const trm = periodType === PeriodType.USD ? currentMonth.trm : 0;
+          const manualTrm = periodType === PeriodType.USD ? (currentMonth.manualTrm ?? null) : null;
+          const effectiveTrm = periodType === PeriodType.USD ? getEffectiveTrm({ trm, manualTrm }) : 0;
 
-          const salaryCop = periodType === PeriodType.USD ? Big(currentMonth.salaryUsd).times(currentMonth.trm).toNumber() : currentMonth.salaryCop;
-          const bonusCop = periodType === PeriodType.USD ? Big(currentMonth.bonusUsd).times(currentMonth.trm).toNumber() : currentMonth.bonusCop;
+          const salaryCop = periodType === PeriodType.USD ? Big(currentMonth.salaryUsd).times(effectiveTrm).toNumber() : currentMonth.salaryCop;
+          const bonusCop = periodType === PeriodType.USD ? Big(currentMonth.bonusUsd).times(effectiveTrm).toNumber() : currentMonth.bonusCop;
           const baseSalary = getBaseSalary(salaryCop);
           const retentions = getSalaryRetentions(salaryCop);
           const netSalaryRetentions = getNetSalaryRetentions(salaryCop);
@@ -78,6 +82,7 @@ export const SalaryProvider = ({ periodType, children }: PropsWithChildren & { p
             salaryUsd,
             bonusUsd,
             trm,
+            manualTrm,
             salaryCop,
             bonusCop,
             baseSalary,
@@ -97,9 +102,11 @@ export const SalaryProvider = ({ periodType, children }: PropsWithChildren & { p
     resetPeriods: () => {
       removeStorage(periodType);
 
-      setPeriods({
-        ...allPeriods,
-        [periodType]: getDefaultPeriods(periodType)
+      getDefaultPeriodsWithOfficialTrm(periodType).then((defaultPeriods) => {
+        setPeriods({
+          ...allPeriods,
+          [periodType]: defaultPeriods
+        });
       });
     }
   };

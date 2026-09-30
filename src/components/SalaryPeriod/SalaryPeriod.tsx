@@ -1,9 +1,9 @@
-import { financial, getNetSalaryRetentions } from '../../utils/utils.ts';
+import { financial, getEffectiveTrm, getNetSalaryRetentions } from '../../utils/utils.ts';
 import { Period } from '../../models/Period.ts';
 import { ISalaryContext } from '../../contexts/SalaryContext.ts';
 import { ChangeEvent, useEffect, useState } from 'react';
 import { Month, PeriodType } from '../../constants/constants.ts';
-import { ChevronDoubleDownIcon } from '@heroicons/react/24/solid';
+import { ArrowPathIcon, ChevronDoubleDownIcon } from '@heroicons/react/24/solid';
 
 export default function SalaryPeriod({ periodType, period, updatePeriod, handleCopySalary }: {
   periodType: PeriodType,
@@ -11,7 +11,7 @@ export default function SalaryPeriod({ periodType, period, updatePeriod, handleC
   updatePeriod: ISalaryContext['updatePeriod'],
   handleCopySalary: (month: Month) => void;
 }) {
-  const [trm, setTrm] = useState(period.trm);
+  const [manualTrm, setManualTrm] = useState(period.manualTrm);
   const [salaryUsd, setSalaryUsd] = useState(period.salaryUsd);
   const [salaryCop, setSalaryCop] = useState(period.salaryCop);
   const [bonusUsd, setBonusUsd] = useState(period.bonusUsd);
@@ -25,14 +25,25 @@ export default function SalaryPeriod({ periodType, period, updatePeriod, handleC
     setSalaryCop(period.salaryCop);
   }, [period.salaryCop]);
 
-  const handleUpdateTrm = (e: ChangeEvent<HTMLInputElement>, month: Month) => {
-    const newTrm = parseFloat(e.target.value);
+  useEffect(() => {
+    setManualTrm(period.manualTrm);
+  }, [period.manualTrm]);
 
-    if (!isNaN(newTrm)) {
-      setTrm(newTrm);
-      updatePeriod(month, { ...period, trm: newTrm });
+  const effectiveTrm = getEffectiveTrm({ trm: period.trm, manualTrm });
+
+  const handleUpdateTrm = (e: ChangeEvent<HTMLInputElement>, month: Month) => {
+    const newRate = parseFloat(e.target.value);
+
+    if (!isNaN(newRate)) {
+      setManualTrm(newRate);
+      updatePeriod(month, { ...period, manualTrm: newRate });
     }
 
+  };
+
+  const handleRestoreTrm = (month: Month) => {
+    setManualTrm(null);
+    updatePeriod(month, { ...period, manualTrm: null });
   };
 
   const handleUpdateSalary = (e: ChangeEvent<HTMLInputElement>, month: Month) => {
@@ -102,15 +113,23 @@ export default function SalaryPeriod({ periodType, period, updatePeriod, handleC
         </div>
       </td>;
 
+  const restoreTrmButton =
+      <button type="button" disabled={ manualTrm === null }
+              className="p-1 focus:outline-none rounded-md hover:enabled:bg-orange-100 disabled:opacity-30 disabled:cursor-not-allowed"
+              title="Restaurar TRM oficial" onClick={ () => handleRestoreTrm(period.month) }>
+        <ArrowPathIcon className="size-4 text-orange-600"></ArrowPathIcon>
+      </button>;
+
   const trmCell =
       <td className="text-center p-2">
         <div
-            className="flex items-center rounder-md bg-white pl-3 outline-1 outline-gray-300 has-[input:focus-within]:outline-2 has-[input:focus-within]:-outline-offset-2 has-[input:focus-within]:outline-orange-300 w-[100px]">
+            className="flex items-center rounder-md bg-white pl-3 outline-1 outline-gray-300 has-[input:focus-within]:outline-2 has-[input:focus-within]:-outline-offset-2 has-[input:focus-within]:outline-orange-300 w-[120px]">
           <div className="shrink-0 text-base text-gray-500 select-none sm:text-sm/6">$</div>
           <input
               className="block min-w-0 grow py-1.5 pr-3 pl-1 text-base text-gray-900 placeholder:text-gray-400 focus:outline-none sm:text-sm/6"
-              type="number" inputMode="decimal" name="trm" defaultValue={ trm }
+              type="number" inputMode="decimal" name="trm" value={ effectiveTrm }
               autoComplete="off" onChange={ (e) => handleUpdateTrm(e, period.month) }/>
+          { restoreTrmButton }
         </div>
       </td>;
 
