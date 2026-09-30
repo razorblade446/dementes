@@ -8,7 +8,7 @@ import {
 import { Period } from '../../models/Period.ts';
 import { ISalaryContext } from '../../contexts/SalaryContext.ts';
 import { ChangeEvent, useEffect, useState } from 'react';
-import { Month, PeriodType } from '../../constants/constants.ts';
+import { DEPENDENTS_DEDUCTION_RATE, DEPENDENTS_UVT_LIMIT, Month, PeriodType } from '../../constants/constants.ts';
 import {
   ArrowPathIcon,
   ChevronDoubleDownIcon,
@@ -22,6 +22,7 @@ export default function SalaryPeriod({
   updatePeriod,
   handleCopySalary,
   showPrima,
+  showDeductions,
 }: {
   periodType: PeriodType;
   period: Period;
@@ -29,6 +30,7 @@ export default function SalaryPeriod({
   updatePeriod: ISalaryContext['updatePeriod'];
   handleCopySalary: (month: Month) => void;
   showPrima: boolean;
+  showDeductions: boolean;
 }) {
   const [manualTrm, setManualTrm] = useState(period.manualTrm);
   const [salaryUsd, setSalaryUsd] = useState(period.salaryUsd);
@@ -234,6 +236,18 @@ export default function SalaryPeriod({
       financial(period.bonusCop)
     );
 
+  const deductionsCell = period.deductions > 0 ? (
+    <Tooltip>
+      <TooltipTrigger>{financial(period.deductions)}</TooltipTrigger>
+      <TooltipContent>
+        Dependientes económicos (Art. 387 E.T., { DEPENDENTS_DEDUCTION_RATE * 100 }% del ingreso
+        laboral bruto, tope { DEPENDENTS_UVT_LIMIT } UVT/mes): { financial(period.deductions) }
+      </TooltipContent>
+    </Tooltip>
+  ) : (
+    '-'
+  );
+
   const primaCell = isPrimaMonth(period.month) ? (
     <Tooltip>
       <TooltipTrigger>{financial(period.prima)}</TooltipTrigger>
@@ -256,6 +270,7 @@ export default function SalaryPeriod({
       <td className="text-center p-2">{financial(period.baseSalary)}</td>
       <td className="w-[150px] text-center">{bonusCopCell}</td>
       {showPrima && <td className="text-center p-2">{primaCell}</td>}
+      {showDeductions && <td className="text-center p-2">{deductionsCell}</td>}
       <td className="text-center p-2">
         {financial(getNetSalaryRetentions(period.salaryCop))}
       </td>

@@ -12,6 +12,7 @@ import {
 import { ISalaryContext, SalaryContextBuilder } from '../contexts/SalaryContext.ts';
 import { CurrencyYearSalaries, YearSalaries } from '../models/YearSalaries.ts';
 import { EventBus } from '../services/EventBus.ts';
+import { getSettings } from '../utils/settings.ts';
 
 const eventBus = EventBus.getInstance();
 
@@ -28,12 +29,15 @@ const getDefaultPeriodsAll = (): CurrencyYearSalaries => {
 
 export const SalaryProvider = ({ periodType, children }: PropsWithChildren & { periodType: PeriodType }) => {
   const [allPeriods, setPeriodsAll] = useState(getDefaultPeriodsAll);
+  const [hasDependents, setHasDependents] = useState(false);
 
   useEffect(() => {
     getBasePeriodsAll().then(setPeriodsAll);
+    getSettings().then((settings) => setHasDependents(settings.hasDependents));
 
     const settingsUpdatedHandler = () => {
       getBasePeriodsAll().then(setPeriodsAll);
+      getSettings().then((settings) => setHasDependents(settings.hasDependents));
     };
 
     eventBus.subscribe('settingsUpdated', settingsUpdatedHandler);
@@ -63,7 +67,7 @@ export const SalaryProvider = ({ periodType, children }: PropsWithChildren & { p
     updatePeriod: (month: Month, period: Period) => {
       setPeriods((oldPeriods: YearSalaries) => {
         const mergedPeriods = { ...oldPeriods, [month]: period };
-        const newPeriods = recalculatePeriods(periodType, mergedPeriods);
+        const newPeriods = recalculatePeriods(periodType, mergedPeriods, hasDependents);
 
         setStorage(periodType, newPeriods);
 

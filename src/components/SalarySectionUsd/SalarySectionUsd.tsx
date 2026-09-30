@@ -33,6 +33,7 @@ export default function SalarySectionUsd() {
   };
 
   const showPrima = Object.values(periods).some((period) => !isIntegralSalary(period.salaryCop));
+  const showDeductions = Object.values(periods).some((period) => period.deductions > 0);
 
   return (
       <SalaryProvider periodType={ PeriodType.USD }>
@@ -50,6 +51,7 @@ export default function SalarySectionUsd() {
               <th scope="col">Salario Base</th>
               <th scope="col" className="max-w-[200px]">Bono COP</th>
               { showPrima && <th scope="col">Prima</th> }
+              { showDeductions && <th scope="col">Deducciones</th> }
               <th scope="col" className="break-word">Retenciones<br/>Salariales</th>
               <th scope="col">Retefuente</th>
               <th scope="col">Salario Neto</th>
@@ -60,7 +62,7 @@ export default function SalarySectionUsd() {
             { Object.entries(periods).map(([_, period]) => (
                 <SalaryPeriod periodType={ PeriodType.USD } period={ period } periods={ periods }
                               updatePeriod={ updatePeriod } handleCopySalary={ handleCopySalary }
-                              showPrima={ showPrima } key={ period.month }/>
+                              showPrima={ showPrima } showDeductions={ showDeductions } key={ period.month }/>
             )) }
 
             </tbody>

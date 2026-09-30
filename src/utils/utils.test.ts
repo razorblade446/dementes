@@ -5,6 +5,7 @@ import {
   getBasePeriodsAll,
   getBaseSalary,
   getDefaultPeriods,
+  getDependentsDeduction,
   getEffectiveTrm,
   getHealthContribution,
   getNetSalary,
@@ -25,6 +26,7 @@ import {
   setStorage
 } from './utils.ts';
 import {
+  DEPENDENTS_UVT_LIMIT_DEDUCTION,
   HEALTH_CONTRIBUTION,
   INTEGRAL_LIMIT,
   MINIMUM_SALARY,
@@ -130,12 +132,45 @@ describe('getTaxExemption', () => {
     const exemptAccumulate = UVT_LIMIT_EXEMPTION + 624540;
     expect(getTaxExemption(5000000, 0, exemptAccumulate)).toBe(0);
   });
+
+  it('subtracts the dependents deduction before computing the 25% (Art. 388 ordering)', () => {
+    // deductedSalary = 4,600,000 - dependentsDeduction (500,000) = 4,100,000
+    // trialExempt = 4,100,000 * .25 = 1,025,000
+    expect(getTaxExemption(5000000, 0, 0, 500000)).toBe(1025000);
+  });
 });
 
 describe('getTaxableSalary', () => {
   it('composes deducted salary + bonus - exemption', () => {
     // deductedSalary = 4,600,000, exemption = 1,150,000 (see getTaxExemption case above)
     expect(getTaxableSalary(5000000, 0, 0)).toBe(3450000);
+  });
+
+  it('also subtracts the dependents deduction from the deducted salary', () => {
+    // deductedSalary = 4,600,000 - 500,000 = 4,100,000, exemption = 1,025,000 (see above)
+    expect(getTaxableSalary(5000000, 0, 0, 500000)).toBe(3075000);
+  });
+});
+
+describe('getDependentsDeduction', () => {
+  it('returns 0 when the worker has no qualifying dependent', () => {
+    expect(getDependentsDeduction(5000000, 0, false)).toBe(0);
+  });
+
+  it('returns 10% of (baseSalary + bonus) when under the 32-UVT monthly cap', () => {
+    expect(getDependentsDeduction(5000000, 0, true)).toBe(500000);
+  });
+
+  it('is capped at 32 UVT/month for high incomes', () => {
+    expect(getDependentsDeduction(30000000, 0, true)).toBe(DEPENDENTS_UVT_LIMIT_DEDUCTION);
+  });
+
+  it('uses baseSalary (70% factor) for integral salaries, plus bonus', () => {
+    const integralSalary = INTEGRAL_LIMIT + 1000000;
+    const baseSalary = getBaseSalary(integralSalary);
+    expect(getDependentsDeduction(integralSalary, 0, true)).toBe(
+      Math.min(baseSalary * 0.1, DEPENDENTS_UVT_LIMIT_DEDUCTION)
+    );
   });
 });
 
@@ -317,6 +352,21 @@ describe('getDefaultPeriods', () => {
     const netSalaryRetentions = retentions.health + retentions.retirement + (retentions.solidarity ?? 0);
 
     expect(periods.Enero.netSalary).toBe(salaryCop + bonusCop - netSalaryRetentions - tax);
+  });
+
+  it('defaults deductions to 0 when hasDependents is not passed', () => {
+    const periods = getDefaultPeriods(PeriodType.COP);
+
+    expect(periods.Enero.deductions).toBe(0);
+  });
+
+  it('computes the dependents deduction and folds it into a lower tax when hasDependents is true', () => {
+    const withoutDependents = getDefaultPeriods(PeriodType.COP, undefined, false);
+    const withDependents = getDefaultPeriods(PeriodType.COP, undefined, true);
+
+    expect(withDependents.Enero.deductions).toBe(getDependentsDeduction(12000000, 5200000, true));
+    expect(withDependents.Enero.deductions).toBeGreaterThan(0);
+    expect(withDependents.Enero.tax).toBeLessThan(withoutDependents.Enero.tax);
   });
 });
 

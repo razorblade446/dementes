@@ -1,4 +1,6 @@
 import {
+  DEPENDENTS_DEDUCTION_RATE,
+  DEPENDENTS_UVT_LIMIT_DEDUCTION,
   EXEMPTION_FACTOR,
   HEALTH_CONTRIBUTION,
   INTEGRAL_LIMIT,
@@ -99,10 +101,24 @@ export const getNetSalaryRetentions = (salary: number): number => {
   return Big(health).plus(retirement).plus(solidarity ?? 0).toNumber();
 };
 
-export const getTaxExemption = (salary: number, bonus: number ,exemptAccumulate: number): number => {
+// Deducción por dependientes (Art. 387 E.T., docs/tax.md §1) — flat 10% of gross monthly labor
+// income, capped at 32 UVT/month. Doesn't scale with dependent count; requires at least one
+// qualifying dependent (hasDependents).
+export const getDependentsDeduction = (salary: number, bonus: number, hasDependents: boolean): number => {
+  if (!hasDependents) {
+    return 0;
+  }
+
+  const grossLaborIncome = Big(getBaseSalary(salary)).plus(bonus);
+  const trialDeduction = grossLaborIncome.times(DEPENDENTS_DEDUCTION_RATE);
+
+  return (trialDeduction.gt(DEPENDENTS_UVT_LIMIT_DEDUCTION) ? Big(DEPENDENTS_UVT_LIMIT_DEDUCTION) : trialDeduction).toNumber();
+};
+
+export const getTaxExemption = (salary: number, bonus: number, exemptAccumulate: number, dependentsDeduction = 0): number => {
   const netSalaryRetentions = getNetSalaryRetentions(salary);
 
-  const deductedSalary = Big(salary).minus(netSalaryRetentions);
+  const deductedSalary = Big(salary).minus(netSalaryRetentions).minus(dependentsDeduction);
 
   // TODO: test for values less than 0
   let remainingExempt = Big(UVT_LIMIT_EXEMPTION).minus(exemptAccumulate);
@@ -171,12 +187,12 @@ export const getPrimaTax = (prima: number, exemptAccumulate: number): number => 
   return getTaxFromTaxableAmount(primaTaxable);
 };
 
-export const getTaxableSalary = (salary: number, bonus: number, exemptAccumulate: number): number => {
+export const getTaxableSalary = (salary: number, bonus: number, exemptAccumulate: number, dependentsDeduction = 0): number => {
   const netSalaryRetentions = getNetSalaryRetentions(salary);
 
-  const deductedSalary = Big(salary).minus(netSalaryRetentions);
+  const deductedSalary = Big(salary).minus(netSalaryRetentions).minus(dependentsDeduction);
 
-  const realExempt = getTaxExemption(salary, bonus, exemptAccumulate);
+  const realExempt = getTaxExemption(salary, bonus, exemptAccumulate, dependentsDeduction);
 
   return deductedSalary.plus(bonus).minus(realExempt).toNumber();
 };
@@ -206,18 +222,18 @@ export const getTaxFromTaxableAmount = (taxableAmount: number): number => {
   }
 };
 
-export const getTax = (salary: number, bonus: number, exemptAccumulate: number): number => {
-  const taxableSalary = getTaxableSalary(salary, bonus, exemptAccumulate);
+export const getTax = (salary: number, bonus: number, exemptAccumulate: number, dependentsDeduction = 0): number => {
+  const taxableSalary = getTaxableSalary(salary, bonus, exemptAccumulate, dependentsDeduction);
 
   return getTaxFromTaxableAmount(taxableSalary);
 };
 
-export const getNetSalary = (salary: number, bonus: number, exemptAccumulate: number) => {
+export const getNetSalary = (salary: number, bonus: number, exemptAccumulate: number, dependentsDeduction = 0) => {
   const { health, retirement, solidarity } = getSalaryRetentions(salary);
 
   const totalRetentions = Big(health).plus(retirement).plus(solidarity ?? 0);
 
-  const tax = getTax(salary, bonus, exemptAccumulate);
+  const tax = getTax(salary, bonus, exemptAccumulate, dependentsDeduction);
 
   return Big(salary).plus(bonus).minus(totalRetentions).minus(tax).toNumber();
 };
@@ -226,7 +242,11 @@ export const getNetSalary = (salary: number, bonus: number, exemptAccumulate: nu
 // COP conversion) from each period's raw inputs (salaryUsd/salaryCop, bonusUsd/bonusCop, trm,
 // manualTrm). Used both on user edits and to refresh periods loaded from storage, so stored data
 // from before a formula/field change (e.g. prima) doesn't surface stale or missing values.
-export const recalculatePeriods = (periodType: PeriodType, periods: Record<Month, Period>): Record<Month, Period> => {
+export const recalculatePeriods = (
+  periodType: PeriodType,
+  periods: Record<Month, Period>,
+  hasDependents = false
+): Record<Month, Period> => {
   let exemptAccumulate = 0;
 
   const newPeriods = {} as Record<Month, Period>;
@@ -245,9 +265,10 @@ export const recalculatePeriods = (periodType: PeriodType, periods: Record<Month
     const baseSalary = getBaseSalary(salaryCop);
     const retentions = getSalaryRetentions(salaryCop);
     const netSalaryRetentions = getNetSalaryRetentions(salaryCop);
-    const salaryTax = getTax(salaryCop, bonusCop, exemptAccumulate);
+    const deductions = getDependentsDeduction(salaryCop, bonusCop, hasDependents);
+    const salaryTax = getTax(salaryCop, bonusCop, exemptAccumulate, deductions);
 
-    exemptAccumulate += getTaxExemption(salaryCop, bonusCop, exemptAccumulate);
+    exemptAccumulate += getTaxExemption(salaryCop, bonusCop, exemptAccumulate, deductions);
 
     let prima = 0;
     let primaTax = 0;
@@ -271,6 +292,7 @@ export const recalculatePeriods = (periodType: PeriodType, periods: Record<Month
       bonusCop,
       baseSalary,
       retentions,
+      deductions,
       prima,
       tax,
       netSalary
@@ -282,7 +304,8 @@ export const recalculatePeriods = (periodType: PeriodType, periods: Record<Month
 
 export const getDefaultPeriods = (
   periodType: PeriodType,
-  trmByMonth?: Partial<Record<Month, number>>
+  trmByMonth?: Partial<Record<Month, number>>,
+  hasDependents = false
 ): Record<Month, Period> => {
   const rawPeriods = MONTHS.reduce<Record<Month, Period>>((periods, month) => {
     const salaryUsd = periodType === PeriodType.USD ? 3000 : 0;
@@ -303,6 +326,7 @@ export const getDefaultPeriods = (
       manualTrm: null,
       baseSalary: 0,
       retentions: { health: 0, retirement: 0, solidarity: 0 },
+      deductions: 0,
       prima: 0,
       tax: 0,
       netSalary: 0
@@ -311,24 +335,26 @@ export const getDefaultPeriods = (
     return periods;
   }, {} as unknown as Record<Month, Period>);
 
-  return recalculatePeriods(periodType, rawPeriods);
+  return recalculatePeriods(periodType, rawPeriods, hasDependents);
 };
 
 export const getDefaultPeriodsWithOfficialTrm = async (periodType: PeriodType): Promise<Record<Month, Period>> => {
+  const { trmReferenceDay, hasDependents } = await getSettings();
+
   if (periodType !== PeriodType.USD) {
-    return getDefaultPeriods(periodType);
+    return getDefaultPeriods(periodType, undefined, hasDependents);
   }
 
-  const { trmReferenceDay } = await getSettings();
   const trmByMonth = await getOfficialTrmByMonth(new Date().getFullYear(), trmReferenceDay);
 
-  return getDefaultPeriods(periodType, trmByMonth);
+  return getDefaultPeriods(periodType, trmByMonth, hasDependents);
 };
 
 // Re-fetches the official TRM (using the given reference day) for every stored USD month that
 // has no manual override, then recomputes and persists that month — months with a manual
 // override (Period.manualTrm) are left untouched, per Settings' TRM reference-day behavior.
-export const recalculateAutomaticTrmPeriods = async (referenceDay: number): Promise<void> => {
+// Also re-applies hasDependents, since a Settings save can change either value.
+export const recalculateAutomaticTrmPeriods = async (referenceDay: number, hasDependents: boolean): Promise<void> => {
   const storedPeriods = await getStorage(PeriodType.USD);
 
   if (!storedPeriods) {
@@ -349,16 +375,32 @@ export const recalculateAutomaticTrmPeriods = async (referenceDay: number): Prom
     }
   }
 
-  const newPeriods = recalculatePeriods(PeriodType.USD, updatedPeriods);
+  const newPeriods = recalculatePeriods(PeriodType.USD, updatedPeriods, hasDependents);
 
   await setStorage(PeriodType.USD, newPeriods);
+};
+
+// Recomputes and persists stored COP periods (which don't go through the TRM refresh above) when
+// a Settings save changes hasDependents. No-op if nothing is stored yet.
+export const recalculateStoredCopPeriods = async (hasDependents: boolean): Promise<void> => {
+  const storedPeriods = await getStorage(PeriodType.COP);
+
+  if (!storedPeriods) {
+    return;
+  }
+
+  const newPeriods = recalculatePeriods(PeriodType.COP, storedPeriods, hasDependents);
+
+  await setStorage(PeriodType.COP, newPeriods);
 };
 
 export const getBasePeriods = async (periodType: PeriodType): Promise<Record<Month, Period>> => {
   const storedPeriods = await getStorage(periodType);
 
   if (storedPeriods) {
-    return recalculatePeriods(periodType, storedPeriods);
+    const { hasDependents } = await getSettings();
+
+    return recalculatePeriods(periodType, storedPeriods, hasDependents);
   }
 
   return getDefaultPeriodsWithOfficialTrm(periodType);
