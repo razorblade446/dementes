@@ -6,6 +6,8 @@ import {
   Month,
   MONTHS,
   PeriodType,
+  PRIMA_TAX_METHOD,
+  PrimaTaxMethod,
   RETIREMENT_CONTRIBUTION,
   UVT,
   UVT_LIMIT_EXEMPTION
@@ -38,8 +40,12 @@ export const removeStorage = (periodType: PeriodType) => {
   return deleteIdbValue(getStorageKey(periodType));
 };
 
+export const isIntegralSalary = (salary: number): boolean => {
+  return Big(salary).gte(INTEGRAL_LIMIT);
+};
+
 export const getBaseSalary = (salary: number): number => {
-  const baseSalary = Big(salary).gte(INTEGRAL_LIMIT) ? Big(salary).times(.7) : Big(salary);
+  const baseSalary = isIntegralSalary(salary) ? Big(salary).times(.7) : Big(salary);
 
   return baseSalary.round(0, 3).toNumber();
 };
@@ -109,6 +115,61 @@ export const getTaxExemption = (salary: number, bonus: number ,exemptAccumulate:
   return (trialExempt.gt(remainingExempt) ? remainingExempt : trialExempt).toNumber();
 };
 
+const FIRST_SEMESTER_MONTHS: Month[] = MONTHS.slice(0, 6);
+const SECOND_SEMESTER_MONTHS: Month[] = MONTHS.slice(6, 12);
+
+export const PRIMA_MONTHS: Month[] = ['Junio', 'Diciembre'];
+
+export const isPrimaMonth = (month: Month): boolean => {
+  return PRIMA_MONTHS.includes(month);
+};
+
+export const getSemesterMonths = (month: Month): Month[] => {
+  return FIRST_SEMESTER_MONTHS.includes(month) ? FIRST_SEMESTER_MONTHS : SECOND_SEMESTER_MONTHS;
+};
+
+// Average of the semester's six getBaseSalary() values (docs/tax.md §5) — `periods` must already
+// hold every month of that semester up to and including `month` (true for a forward Jan->Dec pass).
+export const getSemesterAvgBaseSalary = (periods: Record<Month, Pick<Period, 'baseSalary'>>, month: Month): number => {
+  const semesterMonths = getSemesterMonths(month);
+
+  const total = semesterMonths.reduce((sum, semesterMonth) => {
+    return sum + (periods[semesterMonth]?.baseSalary ?? 0);
+  }, 0);
+
+  return Big(total).div(semesterMonths.length).toNumber();
+};
+
+export const getPrima = (semesterAvgBaseSalary: number): number => {
+  return Big(semesterAvgBaseSalary).div(2).round(0, 3).toNumber();
+};
+
+// Prima's own 25%/790-UVT exemption draw (Art. 385 E.T.) — no retentions subtracted, prima isn't a
+// retention base (Art. 307 CST). Shares the same annual exemptAccumulate cap as getTaxExemption().
+export const getPrimaExemption = (prima: number, exemptAccumulate: number): number => {
+  let remainingExempt = Big(UVT_LIMIT_EXEMPTION).minus(exemptAccumulate);
+
+  if (remainingExempt.lte(0)) {
+    remainingExempt = Big(0);
+  }
+
+  const trialExempt = Big(prima).times(EXEMPTION_FACTOR);
+
+  return (trialExempt.gt(remainingExempt) ? remainingExempt : trialExempt).toNumber();
+};
+
+// Procedimiento 1 (Art. 385 E.T.) only — prima taxed independently of the month's salary bracket.
+export const getPrimaTax = (prima: number, exemptAccumulate: number): number => {
+  if (PRIMA_TAX_METHOD !== PrimaTaxMethod.PROCEDIMIENTO_1) {
+    return 0;
+  }
+
+  const primaExempt = getPrimaExemption(prima, exemptAccumulate);
+  const primaTaxable = Big(prima).minus(primaExempt).toNumber();
+
+  return getTaxFromTaxableAmount(primaTaxable);
+};
+
 export const getTaxableSalary = (salary: number, bonus: number, exemptAccumulate: number): number => {
   const netSalaryRetentions = getNetSalaryRetentions(salary);
 
@@ -119,10 +180,8 @@ export const getTaxableSalary = (salary: number, bonus: number, exemptAccumulate
   return deductedSalary.plus(bonus).minus(realExempt).toNumber();
 };
 
-export const getTax = (salary: number, bonus: number, exemptAccumulate: number): number => {
-  const taxableSalary = Big(getTaxableSalary(salary, bonus, exemptAccumulate));
-
-  const salaryUvt = taxableSalary.div(UVT);
+export const getTaxFromTaxableAmount = (taxableAmount: number): number => {
+  const salaryUvt = Big(taxableAmount).div(UVT);
 
   if (salaryUvt.lte(95)) {
     return 0;
@@ -146,6 +205,12 @@ export const getTax = (salary: number, bonus: number, exemptAccumulate: number):
   }
 };
 
+export const getTax = (salary: number, bonus: number, exemptAccumulate: number): number => {
+  const taxableSalary = getTaxableSalary(salary, bonus, exemptAccumulate);
+
+  return getTaxFromTaxableAmount(taxableSalary);
+};
+
 export const getNetSalary = (salary: number, bonus: number, exemptAccumulate: number) => {
   const { health, retirement, solidarity } = getSalaryRetentions(salary);
 
@@ -156,12 +221,69 @@ export const getNetSalary = (salary: number, bonus: number, exemptAccumulate: nu
   return Big(salary).plus(bonus).minus(totalRetentions).minus(tax).toNumber();
 };
 
+// Recomputes every derived field (baseSalary, retentions, prima, tax, netSalary, and for USD the
+// COP conversion) from each period's raw inputs (salaryUsd/salaryCop, bonusUsd/bonusCop, trm,
+// manualTrm). Used both on user edits and to refresh periods loaded from storage, so stored data
+// from before a formula/field change (e.g. prima) doesn't surface stale or missing values.
+export const recalculatePeriods = (periodType: PeriodType, periods: Record<Month, Period>): Record<Month, Period> => {
+  let exemptAccumulate = 0;
+
+  const newPeriods = {} as Record<Month, Period>;
+
+  for (const month of MONTHS) {
+    const currentMonth = periods[month];
+
+    const salaryUsd = periodType === PeriodType.USD ? currentMonth.salaryUsd : 0;
+    const bonusUsd = periodType === PeriodType.USD ? currentMonth.bonusUsd : 0;
+    const trm = periodType === PeriodType.USD ? currentMonth.trm : 0;
+    const manualTrm = periodType === PeriodType.USD ? (currentMonth.manualTrm ?? null) : null;
+    const effectiveTrm = periodType === PeriodType.USD ? getEffectiveTrm({ trm, manualTrm }) : 0;
+
+    const salaryCop = periodType === PeriodType.USD ? Big(salaryUsd).times(effectiveTrm).toNumber() : currentMonth.salaryCop;
+    const bonusCop = periodType === PeriodType.USD ? Big(bonusUsd).times(effectiveTrm).toNumber() : currentMonth.bonusCop;
+    const baseSalary = getBaseSalary(salaryCop);
+    const retentions = getSalaryRetentions(salaryCop);
+    const netSalaryRetentions = getNetSalaryRetentions(salaryCop);
+    const salaryTax = getTax(salaryCop, bonusCop, exemptAccumulate);
+
+    exemptAccumulate += getTaxExemption(salaryCop, bonusCop, exemptAccumulate);
+
+    let prima = 0;
+    let primaTax = 0;
+
+    if (isPrimaMonth(month)) {
+      prima = getPrima(getSemesterAvgBaseSalary({ ...newPeriods, [month]: { baseSalary } }, month));
+      primaTax = getPrimaTax(prima, exemptAccumulate);
+      exemptAccumulate += getPrimaExemption(prima, exemptAccumulate);
+    }
+
+    const tax = Big(salaryTax).plus(primaTax).toNumber();
+    const netSalary = Big(salaryCop).plus(bonusCop).plus(prima).minus(netSalaryRetentions).minus(tax).toNumber();
+
+    newPeriods[month] = {
+      ...currentMonth,
+      salaryUsd,
+      bonusUsd,
+      trm,
+      manualTrm,
+      salaryCop,
+      bonusCop,
+      baseSalary,
+      retentions,
+      prima,
+      tax,
+      netSalary
+    };
+  }
+
+  return newPeriods;
+};
+
 export const getDefaultPeriods = (
   periodType: PeriodType,
   trmByMonth?: Partial<Record<Month, number>>
 ): Record<Month, Period> => {
-  let exemptAccumulate = 0;
-  return MONTHS.reduce<Record<Month, Period>>((periods, month) => {
+  const rawPeriods = MONTHS.reduce<Record<Month, Period>>((periods, month) => {
     const salaryUsd = periodType === PeriodType.USD ? 3000 : 0;
     const trm = periodType === PeriodType.USD ? (trmByMonth?.[month] ?? DEFAULT_TRM) : 0;
 
@@ -169,13 +291,6 @@ export const getDefaultPeriods = (
 
     const bonusUsd = periodType === PeriodType.USD ? 1300 : 0;
     const bonusCop = periodType === PeriodType.USD ? Big(bonusUsd).times(trm).toNumber() : 5200000;
-
-    const baseSalary = getBaseSalary(salaryCop);
-    const retentions = getSalaryRetentions(salaryCop);
-    const netSalaryRetentions = getNetSalaryRetentions(salaryCop);
-    const tax = getTax(salaryCop, bonusCop, exemptAccumulate);
-
-    const netSalary = Big(salaryCop).plus(bonusCop).minus(netSalaryRetentions).minus(tax).toNumber();
 
     periods[month] = {
       month,
@@ -185,16 +300,17 @@ export const getDefaultPeriods = (
       bonusCop,
       trm,
       manualTrm: null,
-      baseSalary,
-      retentions,
-      tax,
-      netSalary
+      baseSalary: 0,
+      retentions: { health: 0, retirement: 0, solidarity: 0 },
+      prima: 0,
+      tax: 0,
+      netSalary: 0
     };
-
-    exemptAccumulate += getTaxExemption(salaryCop, bonusCop, exemptAccumulate);
 
     return periods;
   }, {} as unknown as Record<Month, Period>);
+
+  return recalculatePeriods(periodType, rawPeriods);
 };
 
 export const getDefaultPeriodsWithOfficialTrm = async (periodType: PeriodType): Promise<Record<Month, Period>> => {
@@ -210,7 +326,11 @@ export const getDefaultPeriodsWithOfficialTrm = async (periodType: PeriodType): 
 export const getBasePeriods = async (periodType: PeriodType): Promise<Record<Month, Period>> => {
   const storedPeriods = await getStorage(periodType);
 
-  return storedPeriods ?? getDefaultPeriodsWithOfficialTrm(periodType);
+  if (storedPeriods) {
+    return recalculatePeriods(periodType, storedPeriods);
+  }
+
+  return getDefaultPeriodsWithOfficialTrm(periodType);
 };
 
 export const getBasePeriodsAll = async (): Promise<CurrencyYearSalaries> => {

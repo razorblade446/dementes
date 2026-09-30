@@ -4,6 +4,7 @@ import SalaryPeriod from '../SalaryPeriod/SalaryPeriod.tsx';
 import { Month, MONTHS, PeriodType } from '../../constants/constants.ts';
 import { SalaryProvider } from '../../providers/SalaryProvider.tsx';
 import { EventBus } from '../../services/EventBus.ts';
+import { isIntegralSalary } from '../../utils/utils.ts';
 
 const eventBus = EventBus.getInstance();
 
@@ -31,6 +32,8 @@ export default function SalarySectionUsd() {
     }
   };
 
+  const showPrima = Object.values(periods).some((period) => !isIntegralSalary(period.salaryCop));
+
   return (
       <SalaryProvider periodType={ PeriodType.USD }>
         <section className="flex flex-wrap justify-between p-8 shadow-xl bg-white bg-opacity-65">
@@ -46,6 +49,7 @@ export default function SalarySectionUsd() {
               <th scope="col">Salario COP</th>
               <th scope="col">Salario Base</th>
               <th scope="col" className="max-w-[200px]">Bono COP</th>
+              { showPrima && <th scope="col">Prima</th> }
               <th scope="col" className="break-word">Retenciones<br/>Salariales</th>
               <th scope="col">Retefuente</th>
               <th scope="col">Salario Neto</th>
@@ -54,9 +58,9 @@ export default function SalarySectionUsd() {
             <tbody
                 className="[&>tr:nth-child(odd)]:bg-white rounded-b-xl">
             { Object.entries(periods).map(([_, period]) => (
-                <SalaryPeriod periodType={ PeriodType.USD } period={ period } updatePeriod={ updatePeriod }
-                              handleCopySalary={ handleCopySalary }
-                              key={ period.month }/>
+                <SalaryPeriod periodType={ PeriodType.USD } period={ period } periods={ periods }
+                              updatePeriod={ updatePeriod } handleCopySalary={ handleCopySalary }
+                              showPrima={ showPrima } key={ period.month }/>
             )) }
 
             </tbody>

@@ -26,3 +26,12 @@ export const RETIREMENT_CONTRIBUTION = 0.04;
 
 // Day of the month whose official TRM (Colombian USD exchange rate) is used for that month's calculation.
 export const TRM_REFERENCE_DAY = 10;
+
+// DIAN-sanctioned methods for withholding tax on prima de servicios (docs/tax.md §5).
+export enum PrimaTaxMethod {
+  PROCEDIMIENTO_1 = 'PROCEDIMIENTO_1', // Art. 385 E.T. — independent calculation, own 25%/790-UVT exemption draw
+  PROCEDIMIENTO_2 = 'PROCEDIMIENTO_2'  // Art. 386 E.T. — fixed semestral percentage, not yet implemented
+}
+
+// Hardcoded until the settings panel/modal exists to let the user choose.
+export const PRIMA_TAX_METHOD: PrimaTaxMethod = PrimaTaxMethod.PROCEDIMIENTO_1;
