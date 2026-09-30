@@ -5,6 +5,23 @@
     <link rel="icon" type="image/svg+xml" href="/dementes/github-mark.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Calculadora de Salario | Dementes</title>
+    <script type="text/javascript">
+      // Reverse the redirect encoded by public/404.html (spa-github-pages
+      // trick) before React Router mounts, so a deep link like /dementes/cop
+      // resolves to the right route instead of always landing on /.
+      (function (l) {
+        if (l.search[1] === '/') {
+          var decoded = l.search
+            .slice(1)
+            .split('&')
+            .map(function (s) {
+              return s.replace(/~and~/g, '&');
+            })
+            .join('?');
+          window.history.replaceState(null, null, l.pathname.slice(0, -1) + decoded + l.hash);
+        }
+      })(window.location);
+    </script>
     <script type="module" crossorigin src="/dementes/assets/index-B2iOEz5x.js"></script>
     <link rel="stylesheet" crossorigin href="/dementes/assets/index-XFXASe0z.css">
   </head>
