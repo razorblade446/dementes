@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.file_path // empty' | { read -r f; case \"$f\" in *.ts|*.tsx) npx eslint \"$f\" 2>&1 || true;; esac; }",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}
