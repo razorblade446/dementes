@@ -4,16 +4,16 @@ import {
   getNetSalaryRetentions,
   getSemesterAvgBaseSalary,
   isPrimaMonth,
-} from "../../utils/utils.ts";
-import { Period } from "../../models/Period.ts";
-import { ISalaryContext } from "../../contexts/SalaryContext.ts";
-import { ChangeEvent, useEffect, useState } from "react";
-import { Month, PeriodType } from "../../constants/constants.ts";
+} from '../../utils/utils.ts';
+import { Period } from '../../models/Period.ts';
+import { ISalaryContext } from '../../contexts/SalaryContext.ts';
+import { ChangeEvent, useEffect, useState } from 'react';
+import { Month, PeriodType } from '../../constants/constants.ts';
 import {
   ArrowPathIcon,
   ChevronDoubleDownIcon,
-} from "@heroicons/react/24/solid";
-import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip.tsx";
+} from '@heroicons/react/24/solid';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip.tsx';
 
 export default function SalaryPeriod({
   periodType,
@@ -26,7 +26,7 @@ export default function SalaryPeriod({
   periodType: PeriodType;
   period: Period;
   periods: Record<Month, Period>;
-  updatePeriod: ISalaryContext["updatePeriod"];
+  updatePeriod: ISalaryContext['updatePeriod'];
   handleCopySalary: (month: Month) => void;
   showPrima: boolean;
 }) {
@@ -109,7 +109,7 @@ export default function SalaryPeriod({
 
   let copyDowmTrm;
 
-  if (period.month !== "Diciembre") {
+  if (period.month !== 'Diciembre') {
     copyDowmTrm = (
       <button
         type="button"
@@ -238,12 +238,12 @@ export default function SalaryPeriod({
     <Tooltip>
       <TooltipTrigger>{financial(period.prima)}</TooltipTrigger>
       <TooltipContent>
-        Promedio salario base del semestre: ${" "}
+        Promedio salario base del semestre: ${' '}
         {financial(getSemesterAvgBaseSalary(periods, period.month))}
       </TooltipContent>
     </Tooltip>
   ) : (
-    "-"
+    '-'
   );
 
   return (

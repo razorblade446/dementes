@@ -1,8 +1,8 @@
-import "./App.scss";
-import NavigationBar from "./components/NavigationBar/NavigationBar.tsx";
-import { LegalInfo } from "./components/LegalInfo/LegalInfo.tsx";
-import { Outlet } from "react-router";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import './App.scss';
+import NavigationBar from './components/NavigationBar/NavigationBar.tsx';
+import { LegalInfo } from './components/LegalInfo/LegalInfo.tsx';
+import { Outlet } from 'react-router';
+import { TooltipProvider } from '@/components/ui/tooltip';
 
 function App() {
   return (
